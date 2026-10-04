@@ -637,3 +637,27 @@ Current formal development benchmark: instant \`pruned8\`, recorded at \`ac88f15
 EXP-006 robustness result: \`03213bb4f3997271177dd4373e1d2edadddbb0ab\`.  
 EXP-007 implementation and outputs will be added after execution.
 
+## Methodological correction — portfolio return accounting
+
+**Date:** 4 October 2026  
+**Status:** complete; hold-out remained locked
+
+A technical reviewer audit after the first research-note freeze identified two issues confined to the secondary economic backtest:
+
+1. portfolio P&L used weighted one-session log returns rather than arithmetic open-to-open returns;
+2. EXP-001/002 did not book the terminal liquidation turnover/cost after the final staggered sleeve, although EXP-003 onward did.
+
+The modelling target remains a log return. Portfolio P&L is now computed from simple next-open-to-open returns, transaction costs are subtracted in arithmetic-return space, and equity/drawdown are compounded with `cumprod(1 + R_net)`. Terminal liquidation is explicitly costed.
+
+All EXP-001 to EXP-005 economic diagnostics were recomputed against the same frozen data and hold-out. Prediction rows, IC, model selection, feature attribution and EXP-006/007 robustness evidence were unchanged.
+
+**Corrected pruned8 benchmark:** zero-cost annualised arithmetic return 2.3444%; 5 bps return 0.2488%; 5 bps Sharpe 0.0647; annualised turnover 41.9124; approximate one-way break-even 5.59 bps.
+
+No pre-registered decision changed. In particular, EXP-004 budget 0.12 retained 79.9649% of zero-cost return and therefore still failed the strict 80% gate.
+
+Correction code: `0eb8aacaa1b7dbee555a7d2bcba6b6fe44c0955b`.  
+Workflow run: `37199738636`.  
+Full audit: `docs/accounting_correction.md`.
+
+The final 252-date hold-out was not accessed.
+

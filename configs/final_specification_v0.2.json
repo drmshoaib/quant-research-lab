@@ -102,7 +102,9 @@
     "gross_limit": 1,
     "cohort_per_name_abs_cap": 0.08,
     "horizon_translation": "five equal-capital staggered sleeves",
-    "final_execution_benchmark": "instant target execution"
+    "final_execution_benchmark": "instant target execution",
+    "return_accounting": "simple next-open-to-open arithmetic returns for P&L; modelling target remains log return",
+    "terminal_liquidation_costed": true
   },
   "transaction_costs": {
     "base_one_way_bps": 5,
@@ -121,11 +123,11 @@
     "hac_p": 0.0000878,
     "median_fold_ic": 0.02766,
     "positive_development_year_fraction": 0.923,
-    "annualized_turnover": 41.91,
-    "annualized_return_0bps": 0.0225,
-    "annualized_return_5bps": 0.0015,
-    "sharpe_5bps": 0.04,
-    "approx_break_even_one_way_bps": 5.37
+    "annualized_turnover": 41.912427976962164,
+    "annualized_return_0bps": 0.023444079466946825,
+    "annualized_return_5bps": 0.0024878654784657468,
+    "sharpe_5bps": 0.06470074182950974,
+    "approx_break_even_one_way_bps": 5.593586580055262
   },
   "robustness_record": {
     "EXP006_overall_pass": false,
@@ -139,6 +141,18 @@
     "final_development_evidence_workflow_sha": "56b22b231d3e3e6c485b680cba34ed2627713c74",
     "development_record_parent_sha": "2b8c516f4d4e13fa9eae34f3df39028f1225b2db",
     "baseline_config_git_blob_sha": "82be787505b677649216d96f5aeb588a66bc68a8",
-    "research_log": "docs/research_log.md"
+    "research_log": "docs/research_log.md",
+    "economic_accounting_workflow_run": 37199738636,
+    "economic_accounting_code_sha": "0eb8aacaa1b7dbee555a7d2bcba6b6fe44c0955b",
+    "accounting_correction_document": "docs/accounting_correction.md"
+  },
+  "accounting_correction": {
+    "date": "2026-10-04",
+    "reason": "Reviewer audit identified portfolio P&L using weighted log returns instead of arithmetic returns, plus missing terminal liquidation cost in EXP-001/002.",
+    "impact": "Prediction targets, IC, model selection and robustness results unchanged; EXP-001 to EXP-005 economic diagnostics recomputed.",
+    "workflow_run": 37199738636,
+    "code_sha": "0eb8aacaa1b7dbee555a7d2bcba6b6fe44c0955b",
+    "decisions_changed": false,
+    "exp004_budget_0_12_retention": 0.7996494104107476
   }
 }

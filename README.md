@@ -1,40 +1,81 @@
 # Quant Research Lab
 
-A research-grade, reproducible project for testing cross-sectional predictive signals in financial time series.
+A reproducible cross-sectional quant research project built around a simple question:
 
-The objective is to demonstrate the workflow expected in serious quantitative research: explicit timing assumptions, leakage controls, purged walk-forward validation, statistical inference, transaction costs, reproducible code, and an untouched final hold-out.
+> Can end-of-day market information rank medium-horizon **relative** ETF returns out of sample?
 
-## Research question
+## Current development result
 
-Can a compact set of lagged market features rank future **relative** returns across a liquid fixed ETF universe out of sample?
+The frozen development model is an eight-feature `HistGradientBoostingRegressor` (`pruned8`) evaluated with next-open execution and purged expanding-window validation.
 
-At decision date `t`, features use information available by the close. The target enters at the next open and exits five sessions later. The final 252 eligible decision dates in the frozen v0.2 data window are locked during normal development.
+- mean 5-session daily rank IC: **0.02701**;
+- HAC t-statistic: **3.922**, two-sided **p = 8.78e-5**;
+- positive mean IC in **12/13** eligible development years;
+- 999-path symbol-identity placebo: empirical **p = 0.001**;
+- 10- and 20-session horizon checks remain significant after BH correction;
+- group-neutral retraining retains **86.3%** of the control within-group IC.
 
-## What is implemented
+The evidence is statistically interesting but **not a production trading result**. Under corrected arithmetic-return portfolio accounting, the instant five-sleeve benchmark earns about **2.34% annualised before costs** and **0.25% at 5 bps one way**, with annualised turnover **41.91** and Sharpe **0.065**. Cross-asset robustness is also incomplete: EXP-006 and EXP-007 each fail one pre-registered robustness condition.
 
-- provider-agnostic long-form OHLCV data interface;
-- split/dividend-adjusted Yahoo OHLC adapter;
-- fixed v0.2 data end date;
-- immutable hold-out date manifest workflow;
-- pre-hold-out embargo to stop development labels overlapping hold-out outcomes;
-- lagged momentum, volatility, range, volume and drawdown features;
+**The final 252-date hold-out remains locked and unevaluated.**
+
+Read the evidence in:
+
+- [Research note](docs/research_note.md)
+- [Final frozen specification](configs/final_specification_v0.2.json)
+- [Research log](docs/research_log.md)
+- [Portfolio-accounting correction](docs/accounting_correction.md)
+- [Research protocol](docs/research_protocol.md)
+
+## Research discipline
+
+The project is designed to demonstrate research process rather than optimise a headline backtest:
+
+- fixed data window and checksum;
+- immutable hold-out date manifest;
 - next-open execution convention;
-- 5-session forward cross-sectional relative-return target;
-- expanding **purged walk-forward** validation;
-- Ridge regression baseline;
-- histogram gradient boosting nonlinear comparator;
-- daily Spearman rank IC;
-- HAC/Newey-West inference for overlapping horizons;
-- dollar-neutral, gross-constrained rank portfolios;
-- five staggered portfolio sleeves aligned with the 5-session forecast;
-- transaction-cost-aware backtesting on actual composite turnover;
-- constrained alpha/risk/turnover optimiser using SLSQP for the later optimisation phase;
-- explicit 252-session locked hold-out;
-- unit tests for leakage, split purging, price adjustment, hold-out locking, portfolio alignment, constraints and costs.
+- horizon-aware purging and pre-hold-out embargo;
+- pre-registered experiment rules;
+- daily Spearman rank IC with HAC/Newey-West inference;
+- multiple-testing control where relevant;
+- negative-result retention;
+- explicit transaction costs and turnover;
+- robustness and placebo testing;
+- unit tests for leakage, timing, price adjustment, portfolio alignment and constraints.
 
-## Why ETFs in v0.1/v0.2?
+## Frozen v0.2 specification
 
-Using today's equity constituents to backtest history creates a survivorship problem. The first empirical phase therefore uses a fixed universe of liquid ETFs spanning equities, sectors, rates, credit, commodities and real estate. A later equity phase will use point-in-time membership data.
+Primary horizon: **5 sessions**.
+
+Features:
+
+`ret_1`, `mom_20`, `mom_60`, `vol_20`, `vol_60`, `range_1`, `volume_z_20`, `drawdown_60`.
+
+Model:
+
+`HistGradientBoostingRegressor(learning_rate=0.05, max_iter=250, max_leaf_nodes=15, min_samples_leaf=40, l2_regularization=1.0, random_state=42)`.
+
+Validation:
+
+- minimum training history: 756 decision dates;
+- test block / step: 63 / 63 dates;
+- train/test purge: 6 dates;
+- pre-hold-out embargo: 6 dates;
+- final hold-out: 252 eligible dates, 24 September 2025 to 24 September 2026.
+
+## Why ETFs?
+
+Using current equity constituents throughout history creates a severe constituent-membership survivorship problem. This first empirical phase instead uses a fixed 30-ETF universe spanning equities, rates, credit, commodities and real estate.
+
+That choice **reduces one source of membership bias; it does not make the universe point-in-time or unbiased**. The ETF set itself is selected ex post and cross-sectional breadth is uneven. A later equity phase should use point-in-time membership data.
+
+## Repository structure
+
+- `src/quantlab/` — data, features, targets, models, splits, portfolio and robustness code;
+- `scripts/` — reproducible experiment runners;
+- `configs/` — frozen baseline, data snapshot, hold-out and final specification;
+- `docs/` — protocol, audit trail, experiment results and research note;
+- `tests/` — leakage, timing, accounting and constraint tests.
 
 ## Installation
 
@@ -42,69 +83,16 @@ Using today's equity constituents to backtest history creates a survivorship pro
 python -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev,data]'
-```
-
-## Run tests
-
-```bash
 pytest
 ```
 
-## Freeze the v0.2 hold-out
+## Development history
 
-The data window is fixed in `configs/baseline.json`. Before running empirical experiments, generate the 252-date hold-out manifest once:
+- **v0.1:** methodology scaffold and leakage-safe validation.
+- **v0.2:** frozen ETF development programme, EXP-001 through EXP-007, robustness work and research note.
+- **Current state:** development specification frozen; hold-out not yet evaluated.
+- **Future:** one-time hold-out decision, then point-in-time equity research and risk-aware portfolio construction as separate phases.
 
-```bash
-python scripts/freeze_holdout.py
-```
+## Scope
 
-Then review and commit `configs/holdout_dates.csv`. The development script refuses to run without this manifest.
-
-With a provider-exported **adjusted** OHLCV CSV:
-
-```bash
-python scripts/freeze_holdout.py --data path/to/ohlcv.csv
-```
-
-## Run the development experiment
-
-With Yahoo data:
-
-```bash
-python scripts/run_baseline.py
-```
-
-Or with the same provider-exported adjusted OHLCV CSV:
-
-```bash
-python scripts/run_baseline.py --data path/to/ohlcv.csv
-```
-
-Outputs are written below `outputs/baseline/`. **The final 252-session hold-out is not scored by this script.**
-
-## Research discipline
-
-Before the hold-out is unlocked, freeze:
-
-1. data snapshot and hold-out manifest;
-2. universe;
-3. features;
-4. prediction horizon;
-5. model family and hyperparameters;
-6. portfolio construction;
-7. cost assumptions;
-8. evaluation metrics.
-
-See [`docs/research_protocol.md`](docs/research_protocol.md), [`docs/v0.2_audit.md`](docs/v0.2_audit.md) and [`docs/research_log.md`](docs/research_log.md).
-
-## Planned phases
-
-- **v0.1 — methodology scaffold:** leakage-safe panel, walk-forward validation, baselines, inference, tests.
-- **v0.2 — empirical baseline:** fixed data/hold-out protocol, full-history development experiments, IC stability and transaction-cost sensitivity.
-- **v0.3 — optimisation:** covariance-aware portfolio construction and turnover/risk constraints.
-- **v0.4 — point-in-time equities:** introduce a survivorship-safe equity universe.
-- **v0.5 — research note:** publish a concise 4–6 page report including negative results and the one-time hold-out evaluation.
-
-## Scope and disclaimer
-
-This repository is a research/education project. It is not investment advice and is not presented as a production trading system.
+This repository is a research and education project. The portfolio is a diagnostic translation of the signal, not an investment recommendation or production trading system.

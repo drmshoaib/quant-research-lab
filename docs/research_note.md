@@ -2,7 +2,7 @@
 
 **Author:** Muhammad Shoaib  
 **Research programme:** Quant Research Lab v0.2  
-**Status:** Development frozen; final 252-date hold-out locked and unevaluated  
+**Status:** Development frozen after portfolio-accounting audit; final 252-date hold-out locked and unevaluated  
 **Date:** 4 October 2026
 
 ## Executive Summary
@@ -11,7 +11,7 @@ This study asks whether information available at the close of a trading day can 
 
 The strongest development specification is an eight-feature HistGradientBoosting model, **pruned8**, evaluated at a five-session horizon. Across 3,087 out-of-sample development dates it produces mean daily cross-sectional Spearman rank IC **0.02701**, HAC `t=3.922`, `p=8.78e-5`, median fold IC **0.02766**, and positive mean IC in **12 of 13** eligible development years. A 999-replicate global symbol-identity placebo gives empirical one-sided `p=0.001`. The signal is weak at one session but remains statistically significant at 10 and 20 sessions, which is more consistent with a medium-horizon ranking effect than a next-day anomaly.
 
-The statistical signal is substantially stronger than the economic backtest. Under the frozen five-sleeve, dollar-neutral rank portfolio, zero-cost annualised return is **2.25%**, but annualised turnover is **41.91 times gross notional**. At the pre-specified 5 bps one-way cost, annualised net return is only **0.15%** with Sharpe **0.040**, and performance is negative at 10 bps. Several turnover-reduction mechanisms improved cost efficiency, but none satisfied its complete pre-registered promotion rule. The evidence therefore supports a predictive-ranking claim, not a production-ready trading strategy.
+The statistical signal is substantially stronger than the economic backtest. Under the frozen five-sleeve, dollar-neutral rank portfolio, corrected zero-cost annualised arithmetic return is **2.34%**, but annualised turnover is **41.91 times gross notional**. At the pre-specified 5 bps one-way cost, annualised arithmetic net return is only **0.25%** with Sharpe **0.065**, and performance is negative at 10 bps. Several turnover-reduction mechanisms improved cost efficiency, but none satisfied its complete pre-registered promotion rule. The evidence therefore supports a predictive-ranking claim, not a production-ready trading strategy.
 
 Robustness is mixed. Horizon and chronological tests pass, and the symbol-identity placebo is decisively rejected. However, EXP-006 fails its overall rule because removing the 16-name US risk-asset block reduces aggregate IC to **0.01183**, only **43.8%** of the full-universe value, with HAC `p=0.179`. A subsequent group-neutral experiment shows that this weakness is not simply broad asset-class rotation: after removing each broad group's target mean and retraining the model, the equal-weight four-group composite retains **86.3%** of the control within-group IC and remains significant at `p=0.00981`. Nevertheless, its equal-weight non-US composite has `p=0.0501247`, narrowly failing the pre-registered `p<0.05` requirement.
 
@@ -29,7 +29,7 @@ Every material experiment after the initial baseline was registered in `docs/res
 
 The universe contains 30 ETFs spanning US broad equity and sectors, developed and emerging international equity, country ETFs, Treasury duration, investment-grade and high-yield credit, precious metals, oil, agriculture, real estate, biotechnology and retail.
 
-A fixed ETF universe was chosen for v0.2 to avoid the obvious survivorship problem of backtesting today's equity constituents through history. This does not eliminate all universe bias: ETFs have different inception dates, liquidity profiles and economic exposures, and the 30-name panel is not intended to represent the full investable market.
+A fixed ETF universe was chosen for v0.2 to reduce the constituent-membership survivorship problem that would arise from backtesting today's equity constituents through history. It does **not** eliminate universe-selection bias: the ETF set itself was chosen ex post, ETFs have different inception dates, liquidity profiles and economic exposures, and the 30-name panel is not a point-in-time representation of the full investable market.
 
 The research window is frozen from **1 January 2010 to 3 October 2026 exclusive**. Actual adjusted observations run from **4 January 2010 through 2 October 2026**. The frozen dataset contains **126,390 rows** across 30 symbols and has SHA-256 `ec782ac2cd812a6d81abcbf9cbcdecdd448ab8822b585fbd07c3a74968a3bbd3`.
 
@@ -142,15 +142,15 @@ The primary forecast is translated into five staggered equal-capital sleeves. Ea
 
 For instant pruned8 execution:
 
-| One-way cost | Annualised return |
+| One-way cost | Annualised arithmetic return |
 |---:|---:|
-| 0 bps | **2.25%** |
-| 2 bps | **1.41%** |
-| 5 bps | **0.15%** |
-| 10 bps | **-1.94%** |
-| 20 bps | **-6.13%** |
+| 0 bps | **2.34%** |
+| 2 bps | **1.51%** |
+| 5 bps | **0.25%** |
+| 10 bps | **-1.85%** |
+| 20 bps | **-6.04%** |
 
-Annualised turnover is **41.91 times gross notional**. Approximate one-way break-even cost is **5.37 bps**. At the registered 5 bps cost, Sharpe is only **0.040**.
+Annualised turnover is **41.91 times gross notional**. Approximate one-way break-even cost is **5.59 bps**. At the registered 5 bps cost, Sharpe is only **0.065**.
 
 This is the clearest distinction between statistical and economic evidence in the project: the model ranks returns better than chance, but the benchmark portfolio captures that information only at very thin net economics.
 
@@ -158,7 +158,7 @@ This is the clearest distinction between statistical and economic evidence in th
 
 Score smoothing (EXP-002) and uniform portfolio inertia (EXP-003) reduced turnover but destroyed gross alpha faster than they saved costs. Selective turnover budgets and no-trade bands (EXP-004/005) improved 5 bps economics, but no candidate passed its complete pre-registered promotion gate.
 
-The closest turnover-budget candidate raised 5 bps annualised return from **0.15% to 0.29%** while reducing turnover **28.7%**, but retained only **79.46%** of zero-cost return against an 80% requirement. The strongest no-trade candidate raised 5 bps return to **0.30%** while retaining **91.7%** of gross return, but reduced turnover only **15.6%** against a 25% requirement. Neither threshold was relaxed after the result.
+The closest turnover-budget candidate raised corrected 5 bps annualised return from **0.25% to 0.38%** while reducing turnover **28.7%**, but retained only **79.965%** of zero-cost return against an 80% requirement, a miss of about **0.035 percentage points**. The strongest no-trade candidate raised 5 bps return to **0.39%** while retaining **92.1%** of gross return, but reduced turnover only **15.6%** against a 25% requirement. Neither threshold was relaxed after the result.
 
 Instant pruned8 therefore remains the formal execution benchmark.
 
@@ -179,7 +179,7 @@ These failures prevent a stronger claim such as robust cross-asset alpha or a pr
 
 The universe is only 30 ETFs and is fixed rather than a point-in-time equity universe. Cross-sectional breadth is uneven: the US risk block contains 16 names while commodities contain four.
 
-Yahoo adjusted OHLC is suitable for this research stage but is not an institutional execution dataset. The cost model does not model instrument/date-specific bid-ask spreads, market impact, borrow, financing, taxes, queue position or intraday execution uncertainty.
+Yahoo adjusted OHLC is suitable for this research stage but is not an institutional execution dataset. The cost model does not model instrument/date-specific bid-ask spreads, market impact, borrow, financing, taxes, queue position or intraday execution uncertainty. The diagnostic portfolio is dollar neutral but **not** beta-, duration-, volatility- or factor-neutral; equal weight is therefore not equal risk across heterogeneous ETFs.
 
 The model was developed through seven sequential pre-registered experiments on one development sample. Pre-registration constrains but does not eliminate researcher degrees of freedom. The untouched final hold-out is therefore essential if a stronger out-of-sample claim is desired.
 
@@ -212,7 +212,7 @@ The hold-out is to be evaluated **once**. The result must be reported unchanged 
 
 The most important outcome is not a high Sharpe ratio. It is a reproducible chain of evidence separating a statistically detectable nonlinear ranking signal from the much harder problem of converting that signal into robust net returns.
 
-The development data provide convincing evidence that the model is learning non-random medium-horizon cross-sectional structure. They also show that the effect is not uniformly broad across asset groups and that turnover costs consume most of the apparent portfolio edge.
+The development data provide statistically supported evidence that the model is learning non-random medium-horizon cross-sectional structure. They also show that the effect is not uniformly broad across asset groups and that turnover costs consume most of the apparent portfolio edge.
 
 That combination of positive and negative evidence is the appropriate basis for deciding whether the one remaining untouched sample should be spent on a final test.
 
@@ -220,6 +220,6 @@ That combination of positive and negative evidence is the appropriate basis for 
 
 ### Reproducibility record
 
-The full record is in `docs/research_protocol.md`, `docs/research_log.md`, `docs/exp001_results.md` through `docs/exp007_results.md`, `configs/data_snapshot.json`, `configs/holdout_dates.csv`, and `configs/final_specification_v0.2.json`.
+The full record is in `docs/research_protocol.md`, `docs/research_log.md`, `docs/exp001_results.md` through `docs/exp007_results.md`, `docs/accounting_correction.md`, `configs/data_snapshot.json`, `configs/holdout_dates.csv`, and `configs/final_specification_v0.2.json`.
 
-The final development evidence was produced under workflow commit `56b22b231d3e3e6c485b680cba34ed2627713c74`. The development record immediately before this report/manifest freeze is `2b8c516f4d4e13fa9eae34f3df39028f1225b2db`.
+The final statistical development evidence was produced under workflow commit `56b22b231d3e3e6c485b680cba34ed2627713c74`. Portfolio economics were subsequently recomputed under corrected simple-return accounting in workflow run `37199738636` at code commit `0eb8aacaa1b7dbee555a7d2bcba6b6fe44c0955b`, before any hold-out evaluation.
