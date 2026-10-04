@@ -373,7 +373,7 @@ EXP-004 implementation and outputs will be added after execution.
 ## EXP-005 — No-trade band execution
 
 **Date registered:** 4 October 2026  
-**Status:** proposed
+**Status:** complete — no candidate promoted
 
 **Question**  
 Can the fast \`pruned8\` HistGradientBoosting signal be traded more efficiently by ignoring small desired per-name weight changes while executing larger changes immediately, rather than imposing a portfolio-wide turnover budget or temporal smoothing?
