@@ -30,7 +30,7 @@ jobs:
         with:
           name: v0.2-freeze
           path: frozen
-          github-token: \${{ github.token }}
+          github-token: ${{ github.token }}
           repository: drmshoaib/quant-research-lab
           run-id: 37189218641
 
