@@ -27,50 +27,50 @@ You do not need advanced stochastic calculus. The project mainly uses logarithms
 
 | Symbol | Meaning |
 |---|---|
-| \(i\) | asset / ETF index |
-| \(t\) | decision date |
-| \(O_{i,t}\) | adjusted opening price of asset \(i\) on date \(t\) |
-| \(C_{i,t}\) | adjusted closing price |
-| \(H_{i,t},L_{i,t}\) | adjusted high and low |
-| \(V_{i,t}\) | volume |
-| \(h\) | forecast horizon; primary value is 5 sessions |
-| \(x_{i,t}\) | feature vector known after the close on date \(t\) |
-| \(y_{i,t}\) | modelling target attached to decision date \(t\) |
-| \(\hat y_{i,t}\) | model prediction / score |
-| \(w_{i,t}\) | portfolio weight |
-| \(IC_t\) | cross-sectional rank information coefficient |
-| \(c\) | one-way transaction cost rate |
-| \(N_t\) | number of eligible assets on date \(t\) |
+| $i$ | asset / ETF index |
+| $t$ | decision date |
+| $O_{i,t}$ | adjusted opening price of asset $i$ on date $t$ |
+| $C_{i,t}$ | adjusted closing price |
+| $H_{i,t},L_{i,t}$ | adjusted high and low |
+| $V_{i,t}$ | volume |
+| $h$ | forecast horizon; primary value is 5 sessions |
+| $x_{i,t}$ | feature vector known after the close on date $t$ |
+| $y_{i,t}$ | modelling target attached to decision date $t$ |
+| $\hat y_{i,t}$ | model prediction / score |
+| $w_{i,t}$ | portfolio weight |
+| $IC_t$ | cross-sectional rank information coefficient |
+| $c$ | one-way transaction cost rate |
+| $N_t$ | number of eligible assets on date $t$ |
 
 ## The central timing idea
 
-At the close of day \(t\), the model may use information up to that close. It may not pretend that it traded at the same close. The first assumed tradable price is the next opening price, \(O_{i,t+1}\).
+At the close of day $t$, the model may use information up to that close. It may not pretend that it traded at the same close. The first assumed tradable price is the next opening price, $O_{i,t+1}$.
 
-For the five-session target, the position enters at \(t+1\) open and exits at \(t+6\) open:
+For the five-session target, the position enters at $t+1$ open and exits at $t+6$ open:
 
-\[
+$$
 r^{(5)}_{i,t}
 =
 \log\left(\frac{O_{i,t+6}}{O_{i,t+1}}\right).
-\]
+$$
 
 Python implementation: [forward_open_return](../../src/quantlab/targets.py) in src/quantlab/targets.py.
 
 ## The research question in mathematical form
 
-Given a feature vector \(x_{i,t}\), learn a function
+Given a feature vector $x_{i,t}$, learn a function
 
-\[
+$$
 f:x_{i,t}\mapsto \hat y_{i,t}
-\]
+$$
 
 such that higher model scores tend to correspond to higher future **relative** returns.
 
 The project is mainly a ranking problem. The primary statistical object is daily Spearman rank correlation:
 
-\[
+$$
 IC_t=\rho_S(\hat y_{\cdot,t},y_{\cdot,t}).
-\]
+$$
 
 ## What the project found on development data
 

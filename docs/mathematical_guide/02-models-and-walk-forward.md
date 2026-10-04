@@ -10,25 +10,25 @@ Main implementation:
 
 Each observation is
 
-\[
+$$
 (x_{i,t},y_{i,t}),
-\]
+$$
 
-where \(x_{i,t}\in\mathbb{R}^p\) is the feature vector and \(y_{i,t}\) is the future relative-return target.
+where $x_{i,t}\in\mathbb{R}^p$ is the feature vector and $y_{i,t}$ is the future relative-return target.
 
 Collect training observations into
 
-\[
+$$
 X\in\mathbb{R}^{n\times p},
 \qquad
 y\in\mathbb{R}^{n}.
-\]
+$$
 
 We seek a function
 
-\[
+$$
 \hat y=f(x)
-\]
+$$
 
 that generalises to later dates.
 
@@ -38,48 +38,48 @@ Python: [make_model](../../src/quantlab/models.py), Ridge branch.
 
 Ordinary least squares minimises
 
-\[
+$$
 \|y-X\beta\|_2^2.
-\]
+$$
 
 Ridge adds an L2 penalty:
 
-\[
+$$
 \min_\beta
 \left[
 \|y-X\beta\|_2^2
 +
 \alpha\|\beta\|_2^2
 \right].
-\]
+$$
 
 The project fixes
 
-\[
+$$
 \alpha=10.
-\]
+$$
 
 Ignoring intercept details, the closed-form solution is
 
-\[
+$$
 \hat\beta
 =
 (X^TX+\alpha I)^{-1}X^Ty.
-\]
+$$
 
-The term \(\alpha I\) stabilises the inverse and shrinks coefficients toward zero.
+The term $\alpha I$ stabilises the inverse and shrinks coefficients toward zero.
 
 ## 3. Standardisation
 
 Ridge is wrapped in StandardScaler.
 
-For feature \(j\),
+For feature $j$,
 
-\[
+$$
 z_{ij}
 =
 \frac{x_{ij}-\mu_j}{s_j}.
-\]
+$$
 
 Scaling matters because the L2 penalty acts on coefficient magnitude. The scaler is fitted only on each training fold because it is inside the scikit-learn pipeline.
 
@@ -87,21 +87,21 @@ Scaling matters because the L2 penalty acts on coefficient magnitude. The scaler
 
 A regression tree repeatedly divides the feature space.
 
-If a node contains observations \(S\), its squared error is
+If a node contains observations $S$, its squared error is
 
-\[
+$$
 SSE(S)
 =
 \sum_{j\in S}(y_j-\bar y_S)^2.
-\]
+$$
 
-A split creates \(S_L\) and \(S_R\). Its improvement is
+A split creates $S_L$ and $S_R$. Its improvement is
 
-\[
+$$
 \Delta
 =
 SSE(S)-SSE(S_L)-SSE(S_R).
-\]
+$$
 
 Each terminal leaf predicts its mean target.
 
@@ -115,42 +115,42 @@ The project uses HistGradientBoostingRegressor.
 
 Boosting builds
 
-\[
+$$
 F_M(x)
 =
 F_0(x)+\eta\sum_{m=1}^{M}f_m(x),
-\]
+$$
 
-where each \(f_m\) is a small regression tree.
+where each $f_m$ is a small regression tree.
 
 For squared-error loss
 
-\[
+$$
 L(y,F)=\frac12(y-F)^2,
-\]
+$$
 
 the negative gradient is
 
-\[
+$$
 -\frac{\partial L}{\partial F}
 =
 y-F.
-\]
+$$
 
 Thus each new tree approximately fits the current residuals.
 
 The update is
 
-\[
+$$
 F_m(x)
 =
 F_{m-1}(x)+\eta f_m(x).
-\]
+$$
 
 Frozen parameters:
 
-- learning rate \(\eta=0.05\);
-- maximum iterations \(M=250\);
+- learning rate $\eta=0.05$;
+- maximum iterations $M=250$;
 - maximum leaf nodes 15;
 - minimum samples per leaf 40;
 - L2 regularisation 1;
@@ -195,44 +195,44 @@ Python:
 
 Let ordered decision dates be
 
-\[
+$$
 d_1,d_2,\ldots,d_T.
-\]
+$$
 
 The first fold conceptually looks like
 
-\[
+$$
 \underbrace{d_1,\ldots,d_{756}}_{training}
 \quad
 \underbrace{d_{757},\ldots,d_{762}}_{purge}
 \quad
 \underbrace{d_{763},\ldots,d_{825}}_{test}.
-\]
+$$
 
 The test block has 63 dates. The next fold advances 63 dates while the training set expands.
 
 Parameters:
 
-\[
+$$
 minTrain=756,\qquad test=63,\qquad step=63.
-\]
+$$
 
-## 11. Why purge \(h+1\) dates?
+## 11. Why purge $h+1$ dates?
 
-For \(h=5\),
+For $h=5$,
 
-\[
+$$
 y_t=
 \log\left(\frac{O_{t+6}}{O_{t+1}}\right).
-\]
+$$
 
 A training label close to the test boundary may use prices from the future test period.
 
 The splitter therefore uses
 
-\[
+$$
 purge=h+1=6.
-\]
+$$
 
 Python: [walk_forward_predictions](../../src/quantlab/pipeline.py).
 
@@ -242,13 +242,13 @@ The same overlap problem occurs before the final hold-out.
 
 The project uses
 
-\[
+$$
 development
 \quad|\quad
 6\text{-date embargo}
 \quad|\quad
 252\text{-date hold-out}.
-\]
+$$
 
 Python: [prepare_research_frame](../../src/quantlab/pipeline.py).
 
@@ -287,15 +287,15 @@ The final evaluation is based on ranks.
 
 Predictions
 
-\[
+$$
 (0.001,0.002,0.003)
-\]
+$$
 
 and
 
-\[
+$$
 (1,2,3)
-\]
+$$
 
 produce the same ranking. For this project, that ordering is more important than exact return magnitude.
 
