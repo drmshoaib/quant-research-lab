@@ -192,7 +192,7 @@ Development-results artifact: `11299225073` (digest `sha256:0156f1f6b0ed1d9b0f1f
 ## EXP-003 — Reduced nonlinear specification and turnover-aware execution
 
 **Date registered:** 4 October 2026  
-**Status:** proposed
+**Status:** complete — pruned8 selected; partial adjustment rejected
 
 **Question**  
 Can the nonlinear ETF signal identified in EXP-001/002 be represented with a smaller feature set, and can portfolio-level partial adjustment reduce trading costs without smoothing away the predictive signal?
@@ -248,13 +248,31 @@ Report the same instant-execution portfolio metrics for all four Part-A feature 
 Use the exact frozen market-data artifact, 252-date locked hold-out, six-date pre-hold-out embargo, purged 49-fold walk-forward design, five-session target, five-sleeve translation, gross/name constraints and 0/2/5/10/20 bps cost grid from EXP-001/002.
 
 **Result**  
-Pending.
+The full9 HistGradientBoosting benchmark reproduced the prior signal: mean rank IC 0.02624, HAC p = 1.19e-4, positive-year fraction 84.6%, and 5 bps net annualised return 0.07%.
+
+Of the three pre-registered reduced specifications, only `pruned8` (full9 excluding `mom_5`) passed every statistical eligibility gate. Its mean rank IC was 0.02701 (102.9% of full9), HAC p = 8.78e-5, median fold IC 0.02766, and 12 of 13 eligible years were positive (92.3%). Its instant portfolio had annualised turnover 41.91, zero-cost annualised return 2.25%, and 5 bps net annualised return 0.15%.
+
+The `core3` volatility/drawdown specification remained statistically significant (mean IC 0.01781, HAC p = 0.00576, 84.6% positive years) but retained only 67.9% of full9 mean IC and therefore failed the pre-registered 80% retention gate. `core2` retained only 45.8% of full9 IC and its HAC p-value was 0.0616. Thus the material ablations identified in EXP-002 are important conditional contributors, but they are not sufficient to reproduce the full nonlinear signal.
+
+For the selected `pruned8` specification, portfolio partial adjustment did not solve the turnover problem. (lambda=0.50) reduced turnover by 27.8% but retained only 70.2% of zero-cost return and did not improve 5 bps net return. (lambda=0.25) reduced turnover by 49.7% but retained only 44.6% of zero-cost return and produced a negative 5 bps net return. Neither rule qualified.
+
+The pruned8 instant portfolio's approximate one-way break-even cost improved slightly to about 5.37 bps, from about 5.16 bps for full9. This is an incremental improvement, not evidence of a robust high-cost strategy.
 
 **Decision**  
-Pending.
+Promote `pruned8` as the current development model specification because it is the only reduced model satisfying all pre-registered statistical gates and it is more parsimonious than full9. Do not interpret this as proof that `mom_5` is individually harmful; EXP-002 did not show a statistically significant ablation benefit from removing it.
+
+Reject portfolio-level partial adjustment at (lambda=0.50) and (lambda=0.25). The results reinforce the conclusion from EXP-002 that uniform temporal inertia destroys useful gross alpha faster than it saves trading cost.
+
+Do not unlock the hold-out. The next justified experiment should preserve the fast pruned8 signal and allocate a fixed turnover budget selectively to the largest portfolio changes, rather than slowing every position uniformly.
 
 **Commit / output references**  
 Frozen data/hold-out: `9dc3f66770e10159949df9c86d4743824fe94b76`.  
 EXP-002 recorded result: `7c0d1af4ca3e861712b1894e24067ade6faa78ce`.  
-EXP-003 implementation and outputs will be added after execution.
+EXP-003 registration: `46f69d890cc58293b2c426ca91067d223ed018ee`.  
+Terminal-liquidation clarification: `55e5b447f35d217010b6749536c54077d9cd54e8`.  
+EXP-003 implementation: `7751eb820dcf7f25ac25967e380bcfddad29c6c7`.  
+Cost-key compatibility fix: `9f99678631eb64418e79637678817280c8b6a8c0`.  
+Successful workflow commit: `dc359949e26188d99f0b0f69bc8ca1f23409c730`.  
+Workflow run: `37191103896`.  
+Development-results artifact: `11299500822` (digest `sha256:561697fcce6519bae1f1cfad72d3f1153250a11f6994125f8a4fa9107eb339c2`).
 
