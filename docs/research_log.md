@@ -561,3 +561,79 @@ Current formal development benchmark: instant \`pruned8\`, recorded at \`ac88f15
 EXP-005 result: \`6593bd4ed72eb6be769f9c3fc55d5f2c667d40b5\`.  
 EXP-006 implementation and outputs will be added after execution.
 
+## EXP-007 — Group-neutral target and within-group alpha
+
+**Date registered:** 4 October 2026  
+**Status:** proposed
+
+**Question**  
+Does the frozen \`pruned8\` HistGradientBoosting specification contain genuine within-asset-group relative-return information after broad asset-class moves are removed from the target, or is the development signal mainly a consequence of between-group structure and the breadth of the US risk-asset block?
+
+**Broad groups**  
+Reuse exactly the four pre-declared groups from EXP-006:
+
+- **US risk assets:** \`US_equity\`, \`US_sector\`, \`real_estate\`, \`biotech\`, \`retail\`;
+- **International equity:** \`developed_ex_US\`, \`emerging_markets\`, \`Japan\`, \`United_Kingdom\`, \`China\`;
+- **Fixed income:** \`long_treasury\`, \`intermediate_treasury\`, \`short_treasury\`, \`investment_grade_credit\`, \`high_yield_credit\`;
+- **Commodities:** \`gold\`, \`silver\`, \`oil\`, \`agriculture\`.
+
+No group definition may change after results are observed.
+
+**Group-neutral target**  
+Keep the five-session next-open-to-open raw return timing from the frozen protocol. For symbol \(i\) in broad group \(g(i)\), define
+
+\[
+y^{GN}_{i,t}
+=
+r^{(5)}_{i,t}
+-
+\frac{1}{N_{g(i),t}}
+\sum_{j\in g(i)} r^{(5)}_{j,t}.
+\]
+
+Thus each broad group's same-date target mean is zero by construction. The model receives no group label or group dummy as a feature.
+
+Use the frozen \`pruned8\` features and the fixed HistGradientBoosting hyperparameters from EXP-003. Use the same 756-date minimum training window, 63-date test blocks, 63-date step, six-date train/test purge and six-date pre-hold-out embargo as the five-session reference experiment.
+
+The 252-date hold-out remains locked and is not scored.
+
+**Control model**  
+On the exact same folds and dates, refit the same \`pruned8\` HistGradientBoosting model using the original full-universe-relative five-session target. This control is not a new model-selection candidate; it provides a same-run reference for within-group IC retention.
+
+**Primary evaluation**  
+For both the group-neutral model and control model:
+
+1. compute daily Spearman rank IC separately inside each of the four broad groups, requiring at least four assets;
+2. form an **equal-weight four-group composite IC** each date by averaging the available group ICs, so the 16-name US risk block receives the same group weight as each smaller block;
+3. form an **equal-weight non-US composite IC** each date by averaging International equity, Fixed income and Commodities.
+
+Use Newey-West/HAC inference with lag 4 for the composite series and each group series.
+
+Also report chronological thirds for the group-neutral equal-weight four-group composite, using the same deterministic date-count split rule as EXP-006.
+
+**EXP-007 acceptance rule**  
+The group-neutral specification passes only if all of the following hold:
+
+1. equal-weight four-group composite mean IC is positive with HAC two-sided \(p<0.05\);
+2. at least three of the four broad groups have positive mean within-group IC;
+3. equal-weight non-US composite mean IC is positive with HAC two-sided \(p<0.05\);
+4. group-neutral equal-weight four-group composite mean IC retains at least 80% of the control model's equal-weight four-group composite mean IC on the same scored dates;
+5. all three chronological thirds of the group-neutral four-group composite have positive mean IC, with at least two of the three having HAC \(p<0.10\).
+
+The 80% retention threshold is carried forward from earlier development experiments rather than chosen from EXP-007 outcomes.
+
+No alternative target centring, group weighting, feature set, model family, horizon or acceptance threshold is tested in EXP-007.
+
+**Interpretation rule**  
+Passing EXP-007 would support the claim that the predictive structure is not merely broad asset-class rotation and that meaningful within-group alpha survives outside the US-risk block.
+
+Failing EXP-007 would be recorded as evidence that the current signal depends materially on between-group structure or on US-risk cross-sectional breadth. The failure would not be repaired by redefining groups after the fact.
+
+Passing EXP-007 does not itself authorise opening the final hold-out. A final specification manifest and research note must still be prepared before any hold-out evaluation.
+
+**Commit / output references**  
+Frozen data/hold-out: \`9dc3f66770e10159949df9c86d4743824fe94b76\`.  
+Current formal development benchmark: instant \`pruned8\`, recorded at \`ac88f152510bd04f4eb774a4746f3c1aacf2338c\`.  
+EXP-006 robustness result: \`03213bb4f3997271177dd4373e1d2edadddbb0ab\`.  
+EXP-007 implementation and outputs will be added after execution.
+
