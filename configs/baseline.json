@@ -1,6 +1,6 @@
 {
   "start": "2010-01-01",
-  "end": null,
+  "end": "2026-10-03",
   "horizon": 5,
   "min_train_days": 756,
   "test_days": 63,
