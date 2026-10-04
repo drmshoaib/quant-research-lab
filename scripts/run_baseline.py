@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from quantlab.backtest import run_backtest, staggered_weights, weights_from_predictions
+from quantlab.backtest import append_liquidation_row, run_backtest, staggered_weights, weights_from_predictions
 from quantlab.data import download_yahoo, load_panel_csv, load_universe, save_panel_csv
 from quantlab.metrics import backtest_summary, rank_ic_by_date, rank_ic_diagnostics
 from quantlab.pipeline import prepare_research_frame, walk_forward_predictions
@@ -109,6 +109,17 @@ def main() -> None:
             cohort,
             horizon=cfg["horizon"],
             decision_dates=realized_dates,
+        )
+        last_live = pd.Timestamp(live_weights.index.get_level_values("date").max())
+        liquidation_candidates = realized_dates[realized_dates > last_live]
+        if not len(liquidation_candidates):
+            raise ValueError("no realised-return date available for terminal liquidation")
+        liquidation_date = pd.Timestamp(liquidation_candidates[0])
+        if liquidation_date >= research.holdout_dates[0]:
+            raise ValueError("terminal liquidation would enter the locked holdout")
+        live_weights = append_liquidation_row(
+            live_weights,
+            liquidation_date=liquidation_date,
         )
 
         base_bt = run_backtest(live_weights, realized, cost_bps=cfg["cost_bps"])
