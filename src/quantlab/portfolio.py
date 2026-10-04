@@ -11,7 +11,17 @@ def rank_weights(
     gross_limit: float = 1.0,
     max_abs_weight: float = 0.08,
 ) -> pd.Series:
-    """Dollar-neutral monotone rank portfolio with gross and name caps."""
+    """Dollar-neutral monotone rank portfolio with gross and name caps.
+
+    Steps: centred percentile ranks -> demean -> scale to the gross limit ->
+    clip each name at the cap -> restore dollar neutrality by scaling down the
+    heavier side (longs or shorts) to match the lighter one.
+
+    The final step keeps every weight inside the cap. Re-demeaning after an
+    asymmetric clip (the earlier implementation) could push a weight back
+    above the cap when scores were tied. For distinct scores the two
+    constructions give identical weights, because the clip is then symmetric.
+    """
     s = scores.dropna().astype(float)
     if len(s) < 2:
         return pd.Series(0.0, index=scores.index)
@@ -20,7 +30,14 @@ def rank_weights(
     if float(np.abs(w).sum()) > 0:
         w = w * (gross_limit / float(np.abs(w).sum()))
     w = w.clip(-max_abs_weight, max_abs_weight)
-    w = w - w.mean()
+    long_side = float(w[w > 0].sum())
+    short_side = float(-w[w < 0].sum())
+    if long_side > 0 and short_side > 0:
+        side = min(long_side, short_side)
+        w = w.where(w <= 0, w * (side / long_side))
+        w = w.where(w >= 0, w * (side / short_side))
+    else:
+        w = w - w.mean()
     gross = float(np.abs(w).sum())
     if gross > gross_limit and gross > 0:
         w = w * (gross_limit / gross)

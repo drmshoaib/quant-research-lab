@@ -366,17 +366,19 @@ $$
 
 That is a 20% drawdown.
 
-## 18. Approximate break-even transaction cost
+## 18. Break-even transaction cost
 
-Because the cost model is linear in turnover,
+Because the cost model is linear in turnover and the project annualises the arithmetic mean of daily returns, the relation is exact rather than approximate:
 
 $$
 R^{net}_{ann}
-\approx
+=
 R^{gross}_{ann}
 -
 c\,TO_{ann}.
 $$
+
+(It would be approximate only for a compound-growth measure of return.)
 
 Set net return to zero:
 

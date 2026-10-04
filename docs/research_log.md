@@ -39,7 +39,7 @@ Record the code commit and output paths.
 ## EXP-001 — Frozen v0.2 baseline
 
 **Date registered:** 4 October 2026  
-**Status:** proposed
+**Status:** complete — primary Ridge baseline rejected; nonlinear comparator retained
 
 **Question**  
 Does the pre-declared v0.1 feature set contain stable cross-sectional information about 5-session relative ETF returns under the frozen v0.2 protocol?
@@ -94,15 +94,18 @@ Portfolio Sharpe is not an acceptance criterion for EXP-001. It is a secondary e
 HistGradientBoosting is compared with Ridge on the same dates and metrics. It is promoted only if its mean rank IC exceeds Ridge and its improvement is reasonably persistent across folds; aggregate Sharpe alone is insufficient.
 
 **Result**  
-Pending.
+Recorded in [`docs/exp001_results.md`](exp001_results.md). Ridge: mean rank IC 0.00365, HAC t = 0.435 (p = 0.664), positive development years 7/13 — fails the acceptance rule. HistGradientBoosting: mean rank IC 0.02624, HAC t = 3.849 (p = 0.000119), positive development years 11/13, positive folds 38/49. The economic figures in that file predate the portfolio-accounting correction; see `docs/accounting_correction.md`.
 
 **Decision**  
-Pending.
+Primary Ridge baseline **rejected**. Nonlinear comparator **retained** for development work (not promoted). Hold-out untouched.
+
+*(This entry's Result and Decision were back-filled on 4 October 2026 from the results file; the original entry had been left at "Pending" after the run, a documentation lapse noted in `docs/errata.md`.)*
 
 **Commit / output references**  
 Protocol freeze: `04e57206fc4c7751dccc8e48cf799d707736af29`.  
 Safeguarded implementation lineage begins at `e3d42f24546edd05c8fd3f8ed9bec8ec15fed9b7`.  
-Frozen data/hold-out commit: `9dc3f66770e10159949df9c86d4743824fe94b76`.\nEXP-001 output references will be added after the run.
+Frozen data/hold-out commit: `9dc3f66770e10159949df9c86d4743824fe94b76`.  
+Results: `docs/exp001_results.md` (workflow `exp001.yml`).
 
 ## EXP-002 — Nonlinear attribution and turnover reduction
 
@@ -360,10 +363,12 @@ The model's rank IC is reported only as a frozen reference because portfolio pro
 Use the exact frozen market-data artifact, 252-date locked hold-out, six-date pre-hold-out embargo, 49-fold purged walk-forward design, five-session target, five-sleeve portfolio translation and transaction-cost assumptions from EXP-001–003.
 
 **Result**  
-Pending.
+Recorded in [`docs/exp004_results.md`](exp004_results.md); corrected economics in `docs/accounting_correction.md` (budget 0.12 retention 79.96% against the 80% gate).
 
 **Decision**  
-Pending.
+No EXP-004 candidate promoted; instant pruned8 remains the formal benchmark. Turnover-budget projection retained as a promising execution mechanism for separately pre-registered follow-up.
+
+*(Back-filled from the results file on 4 October 2026; see `docs/errata.md`.)*
 
 **Commit / output references**  
 Frozen data/hold-out: \`9dc3f66770e10159949df9c86d4743824fe94b76\`.  
@@ -453,10 +458,12 @@ The model's rank IC is reported only as a frozen reference because the no-trade 
 Use the exact frozen market-data artifact, 252-date locked hold-out, six-date pre-hold-out embargo, 49-fold purged walk-forward design, five-session target, five-sleeve portfolio translation and transaction-cost assumptions from EXP-001–004.
 
 **Result**  
-Pending.
+Recorded in [`docs/exp005_results.md`](exp005_results.md); corrected economics in `docs/accounting_correction.md`.
 
 **Decision**  
-Pending.
+No EXP-005 candidate promoted; instant pruned8 remains the formal benchmark. Next phase: robustness and falsification of the signal (EXP-006/007).
+
+*(Back-filled from the results file on 4 October 2026; see `docs/errata.md`.)*
 
 **Commit / output references**  
 Frozen data/hold-out: \`9dc3f66770e10159949df9c86d4743824fe94b76\`.  

@@ -86,7 +86,18 @@ def walk_forward_predictions(
     ridge_alpha: float = 10.0,
     random_state: int = 42,
     feature_columns: Sequence[str] | None = None,
+    purge_days: int | None = None,
 ) -> pd.DataFrame:
+    """Fit one fresh model per purged walk-forward fold and return out-of-sample scores.
+
+    ``purge_days`` defaults to ``horizon + 1``, the frozen v0.2 value. It is a
+    parameter so that the configuration file, not this function, is the single
+    source of truth when a caller wants to pass ``train_test_purge_days``.
+    """
+    if purge_days is None:
+        purge_days = horizon + 1
+    if purge_days < horizon:
+        raise ValueError("purge_days must be at least the prediction horizon")
     features = list(FEATURE_COLUMNS if feature_columns is None else feature_columns)
     if not features:
         raise ValueError("feature_columns must contain at least one feature")
@@ -99,7 +110,7 @@ def walk_forward_predictions(
         min_train_days=min_train_days,
         test_days=test_days,
         step_days=step_days,
-        purge_days=horizon + 1,
+        purge_days=purge_days,
     )
     pieces: list[pd.DataFrame] = []
     for fold, split in enumerate(splitter.split(research.development_dates), start=1):

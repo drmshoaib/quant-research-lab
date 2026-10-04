@@ -29,6 +29,7 @@ Read the evidence in:
 - [Research log](docs/research_log.md)
 - [Portfolio-accounting correction](docs/accounting_correction.md)
 - [Research protocol](docs/research_protocol.md)
+- [Errata and known issues](docs/errata.md) (independent review, October 2026)
 
 ## Research discipline
 

@@ -4,7 +4,6 @@ import argparse
 import json
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from quantlab.backtest import append_liquidation_row, run_backtest, staggered_weights, weights_from_predictions

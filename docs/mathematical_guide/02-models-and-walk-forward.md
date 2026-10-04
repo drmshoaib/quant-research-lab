@@ -226,13 +226,21 @@ y_t=
 \log\left(\frac{O_{t+6}}{O_{t+1}}\right).
 $$
 
-A training label close to the test boundary may use prices from the future test period.
-
-The splitter therefore uses
+A training decision date $d$ has label $\log(O_{d+h+1}/O_{d+1})$, which is only known after the open of session $d+h+1$. If the last training date is $d_{\max}$ and the first test decision date is $d_{\max}+p+1$, every training label is known before the first test decision (and no training label shares a return interval with any test label) exactly when
 
 $$
-purge=h+1=6.
+d_{\max}+h+1 \le d_{\max}+p+1
+\quad\Longleftrightarrow\quad
+p\ge h.
 $$
+
+The minimum purge is therefore $p=h=5$. The project uses
+
+$$
+purge=h+1=6,
+$$
+
+one session more than the minimum, so that no training label uses a price dated on or after the first test decision date at all.
 
 Python: [walk_forward_predictions](../../src/quantlab/pipeline.py).
 

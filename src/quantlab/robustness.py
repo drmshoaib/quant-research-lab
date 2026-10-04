@@ -39,6 +39,15 @@ def prepare_horizon_research_frame(
     eligible = eligible_decision_dates(panel, horizon=horizon, min_assets=min_assets)
 
     holdout_start = pd.Timestamp(holdout[0])
+    # The manifest was frozen on the primary (h=5) calendar, so it cannot be
+    # required to equal the final eligible block of *this* horizon: a longer
+    # horizon loses more trailing dates, a shorter one keeps extra ones after
+    # the manifest's end. What must hold is that the manifest starts inside
+    # this horizon's calendar, so that the embargo below is meaningful, and
+    # that every eligible date from the hold-out start onwards is kept out of
+    # development, which the slicing below guarantees.
+    if holdout_start > eligible[-1]:
+        raise ValueError("holdout manifest starts after the last eligible date for this horizon")
     before_holdout = eligible[eligible < holdout_start]
     embargo_days = horizon + 1
     if len(before_holdout) <= embargo_days:

@@ -9,7 +9,6 @@ from quantlab.robustness import (
 
 
 def test_horizon_frame_applies_hplus1_embargo(synthetic_panel):
-    holdout = pd.bdate_range("2024-01-01", periods=40)
     # Use an actual tail block from the synthetic panel's eligible calendar by
     # deriving a reference frame first.
     from quantlab.targets import eligible_decision_dates

@@ -278,7 +278,7 @@ def main() -> None:
 
     print(json.dumps(summary, indent=2))
     print(
-        "\\nHoldout remains LOCKED. "
+        "\nHoldout remains LOCKED. "
         "EXP-006 used development data only."
     )
 
