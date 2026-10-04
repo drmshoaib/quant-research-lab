@@ -279,7 +279,7 @@ Development-results artifact: `11299500822` (digest `sha256:561697fcce6519bae1f1
 ## EXP-004 — Turnover-budgeted portfolio projection
 
 **Date registered:** 4 October 2026  
-**Status:** proposed
+**Status:** complete — economically encouraging; no candidate promoted
 
 **Question**  
 Can the fast \`pruned8\` HistGradientBoosting signal selected in EXP-003 be expressed more efficiently by allocating a fixed daily turnover budget to the most important portfolio changes, rather than slowing every position uniformly?
