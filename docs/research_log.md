@@ -189,3 +189,72 @@ EXP-002 workflow commit: `25bf422d55b3f2f1451222b58a9563dff8611121`.
 Workflow run: `37190136845`.  
 Development-results artifact: `11299225073` (digest `sha256:0156f1f6b0ed1d9b0f1f38011717f9c50fe40afcf979a79826853ce7a03b9640`).
 
+## EXP-003 — Reduced nonlinear specification and turnover-aware execution
+
+**Date registered:** 4 October 2026  
+**Status:** proposed
+
+**Question**  
+Can the nonlinear ETF signal identified in EXP-001/002 be represented with a smaller feature set, and can portfolio-level partial adjustment reduce trading costs without smoothing away the predictive signal?
+
+**Part A — reduced HistGradientBoosting specifications**  
+Use the same frozen HistGradientBoosting hyperparameters and walk-forward folds. Test exactly four pre-declared feature sets:
+
+1. **full9** — all nine frozen v0.1 features;
+2. **core2** — `vol_20`, `drawdown_60`;
+3. **core3** — `vol_20`, `vol_60`, `drawdown_60`;
+4. **pruned8** — full9 excluding `mom_5`.
+
+No additional feature combinations are tested in EXP-003.
+
+A reduced specification is **statistically eligible** only if all of the following hold:
+
+1. mean daily rank IC is at least 80% of the full9 mean IC;
+2. mean rank IC is positive with Newey-West/HAC two-sided (p<0.05), lag 4;
+3. median fold-level rank IC is positive;
+4. at least 70% of eligible development years have positive mean rank IC.
+
+If more than one reduced specification is eligible, select the one with the fewest features. If two eligible specifications have the same feature count, select the one with the higher mean rank IC.
+
+If no reduced specification is eligible, retain full9 and proceed to Part B with full9.
+
+**Part B — turnover-aware portfolio adjustment**  
+For the selected Part-A specification, form the same daily rank cohort portfolios and five-sleeve live target portfolio (w_t^*) as in EXP-001/002.
+
+Do not smooth model scores. Instead test exactly two recursive portfolio-level adjustment rules in addition to instant rebalancing:
+
+[
+w_t^{(lambda)}=(1-lambda)w_{t-1}^{(lambda)}+lambda w_t^*,
+]
+
+with (lambdain{0.50,0.25}), starting from zero weights.
+
+Because the rule is a convex combination of feasible dollar-neutral portfolios, it preserves neutrality, gross exposure and per-name bounds. Transaction costs are charged on the actual adjusted weights.
+
+The unsmoothed, instant target portfolio ((lambda=1)) is the execution benchmark.
+
+A turnover-aware rule qualifies only if:
+
+1. annualised turnover is reduced by at least 30% relative to instant execution for the same selected feature specification;
+2. zero-cost annualised return retains at least 80% of the instant portfolio's zero-cost annualised return;
+3. 5 bps net annualised return exceeds the instant portfolio's 5 bps net annualised return.
+
+If both partial-adjustment rules qualify, select (lambda=0.50) because it is the less interventionist rule. No other adjustment rates are tested in EXP-003.
+
+**Secondary control**  
+Report the same instant-execution portfolio metrics for all four Part-A feature specifications so that any turnover effect from feature reduction itself is visible. Do not select a model based on Sharpe alone.
+
+**Development-only evaluation**  
+Use the exact frozen market-data artifact, 252-date locked hold-out, six-date pre-hold-out embargo, purged 49-fold walk-forward design, five-session target, five-sleeve translation, gross/name constraints and 0/2/5/10/20 bps cost grid from EXP-001/002.
+
+**Result**  
+Pending.
+
+**Decision**  
+Pending.
+
+**Commit / output references**  
+Frozen data/hold-out: `9dc3f66770e10159949df9c86d4743824fe94b76`.  
+EXP-002 recorded result: `7c0d1af4ca3e861712b1894e24067ade6faa78ce`.  
+EXP-003 implementation and outputs will be added after execution.
+
