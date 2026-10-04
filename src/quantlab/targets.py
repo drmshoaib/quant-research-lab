@@ -59,8 +59,37 @@ def eligible_decision_dates(
 
 
 def next_open_to_open_return(panel: pd.DataFrame) -> pd.Series:
-    """One-session realised log return for a position chosen at decision date t."""
-    return forward_open_return(panel, horizon=1).rename("realized_return")
+    """One-session realised log return aligned to decision date t.
+
+    This remains useful for modelling diagnostics. Portfolio P&L should use
+    next_open_to_open_simple_return so transaction costs and compounding are
+    handled in arithmetic-return space.
+    """
+    return forward_open_return(panel, horizon=1).rename("realized_log_return")
+
+
+def next_open_to_open_simple_return(panel: pd.DataFrame) -> pd.Series:
+    """One-session realised simple return for portfolio P&L.
+
+    A position selected after the close at t enters at open t+1 and earns the
+    simple return to open t+2.
+    """
+    panel = validate_panel(panel)
+    values: list[pd.Series] = []
+    for symbol, g in panel.groupby(level="symbol", sort=False):
+        g = g.droplevel("symbol").sort_index()
+        entry = g["open"].shift(-1)
+        exit_ = g["open"].shift(-2)
+        r = exit_ / entry - 1.0
+        r.name = "realized_return"
+        frame = r.to_frame()
+        frame["symbol"] = symbol
+        frame["date"] = frame.index
+        values.append(
+            frame.reset_index(drop=True)
+            .set_index(["date", "symbol"])["realized_return"]
+        )
+    return pd.concat(values).sort_index()
 
 
 def forward_group_relative_return(
