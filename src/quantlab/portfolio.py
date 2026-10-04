@@ -323,3 +323,249 @@ def optimise_weights(
     out = pd.Series(0.0, index=alpha.index, dtype=float)
     out.loc[names] = w
     return out
+
+
+def no_trade_band_projection(
+    target: pd.Series,
+    previous: pd.Series | None,
+    *,
+    no_trade_band: float,
+    gross_limit: float = 1.0,
+    max_abs_weight: float = 0.08,
+    tolerance: float = 1e-7,
+) -> tuple[pd.Series, dict[str, object]]:
+    """Project toward target while freezing small desired position changes.
+
+    Names with abs(target - previous) <= no_trade_band remain unchanged.
+    Active names may move only between their previous and target weights, so
+    the solver cannot overshoot the desired signal direction.
+    """
+    if no_trade_band < 0:
+        raise ValueError("no_trade_band must be non-negative")
+    t = target.astype(float).copy()
+    p = (
+        pd.Series(0.0, index=t.index, dtype=float)
+        if previous is None
+        else previous.reindex(t.index).fillna(0.0).astype(float)
+    )
+    if len(t) < 2:
+        raise ValueError("target must contain at least two assets")
+
+    delta = t - p
+    active = delta.abs() > no_trade_band
+    desired_l1 = float(delta.abs().sum())
+    ignored_l1 = float(delta.loc[~active].abs().sum())
+    ignored_fraction = ignored_l1 / desired_l1 if desired_l1 > 0 else 0.0
+
+    if not bool(active.any()):
+        info = {
+            "solver_success": True,
+            "used_fallback": False,
+            "message": "no_active_names",
+            "desired_turnover": desired_l1,
+            "actual_turnover": 0.0,
+            "tracking_error": float(np.sqrt(np.square((p - t).to_numpy()).sum())),
+            "active_fraction": 0.0,
+            "held_fraction": 1.0,
+            "ignored_l1_fraction": ignored_fraction,
+            "no_discretionary_trade": True,
+        }
+        return p.rename(target.name or "weight"), info
+
+    n = len(t)
+    target_values = t.to_numpy(dtype=float)
+    prev_values = p.to_numpy(dtype=float)
+    active_values = active.to_numpy(dtype=bool)
+
+    w_lower = np.empty(n, dtype=float)
+    w_upper = np.empty(n, dtype=float)
+    for i in range(n):
+        if active_values[i]:
+            w_lower[i] = max(-max_abs_weight, min(prev_values[i], target_values[i]))
+            w_upper[i] = min(max_abs_weight, max(prev_values[i], target_values[i]))
+        else:
+            w_lower[i] = prev_values[i]
+            w_upper[i] = prev_values[i]
+
+    # x = [w (n), gross auxiliaries g (n)]
+    x0 = np.concatenate([prev_values, np.abs(prev_values)])
+    lower = np.concatenate([w_lower, np.zeros(n)])
+    upper = np.concatenate([w_upper, np.full(n, gross_limit)])
+
+    rows: list[np.ndarray] = []
+    lbs: list[float] = []
+    ubs: list[float] = []
+
+    # g_i >= |w_i|
+    for i in range(n):
+        row = np.zeros(2 * n)
+        row[i] = -1.0
+        row[n + i] = 1.0
+        rows.append(row)
+        lbs.append(0.0)
+        ubs.append(np.inf)
+
+        row = np.zeros(2 * n)
+        row[i] = 1.0
+        row[n + i] = 1.0
+        rows.append(row)
+        lbs.append(0.0)
+        ubs.append(np.inf)
+
+    row = np.zeros(2 * n)
+    row[n:] = 1.0
+    rows.append(row)
+    lbs.append(-np.inf)
+    ubs.append(gross_limit)
+
+    gross_constraint = LinearConstraint(
+        np.vstack(rows),
+        np.asarray(lbs),
+        np.asarray(ubs),
+    )
+    neutrality_row = np.zeros((1, 2 * n))
+    neutrality_row[0, :n] = 1.0
+    neutrality = LinearConstraint(
+        neutrality_row,
+        np.array([0.0]),
+        np.array([0.0]),
+    )
+
+    tiny = 1e-10
+
+    def objective(x: np.ndarray) -> float:
+        w = x[:n]
+        return float(np.square(w - target_values).sum() + tiny * x[n:].sum())
+
+    def gradient(x: np.ndarray) -> np.ndarray:
+        grad = np.full(2 * n, tiny, dtype=float)
+        grad[:n] = 2.0 * (x[:n] - target_values)
+        return grad
+
+    result = minimize(
+        objective,
+        x0,
+        jac=gradient,
+        method="SLSQP",
+        bounds=Bounds(lower, upper),
+        constraints=[gross_constraint, neutrality],
+        options={"maxiter": 300, "ftol": 1e-12, "disp": False},
+    )
+
+    candidate = pd.Series(result.x[:n], index=t.index, dtype=float)
+    actual_turnover = float((candidate - p).abs().sum())
+    neutral_error = abs(float(candidate.sum()))
+    gross = float(candidate.abs().sum())
+    cap = float(candidate.abs().max())
+    bounds_ok = bool(
+        np.all(candidate.to_numpy() >= w_lower - tolerance)
+        and np.all(candidate.to_numpy() <= w_upper + tolerance)
+    )
+
+    feasible = bool(
+        result.success
+        and neutral_error <= tolerance
+        and gross <= gross_limit + tolerance
+        and cap <= max_abs_weight + tolerance
+        and bounds_ok
+    )
+
+    used_fallback = False
+    message = str(result.message)
+    if not feasible:
+        used_fallback = True
+        candidate = p.copy()
+        actual_turnover = 0.0
+        message = f"fallback_previous_after: {result.message}"
+
+    tracking_error = float(
+        np.sqrt(np.square(candidate.to_numpy() - target_values).sum())
+    )
+    info = {
+        "solver_success": feasible,
+        "used_fallback": used_fallback,
+        "message": message,
+        "desired_turnover": desired_l1,
+        "actual_turnover": actual_turnover,
+        "tracking_error": tracking_error,
+        "active_fraction": float(active.mean()),
+        "held_fraction": float((~active).mean()),
+        "ignored_l1_fraction": ignored_fraction,
+        "no_discretionary_trade": bool(actual_turnover <= tolerance),
+    }
+    return candidate.rename(target.name or "weight"), info
+
+
+def no_trade_band_path(
+    target_weights: pd.Series,
+    *,
+    no_trade_band: float,
+    gross_limit: float = 1.0,
+    max_abs_weight: float = 0.08,
+    force_final_zero: bool = False,
+) -> tuple[pd.Series, pd.DataFrame]:
+    """Apply a no-trade-band projection causally through time."""
+    if target_weights.empty:
+        return target_weights.copy(), pd.DataFrame()
+    if (
+        not isinstance(target_weights.index, pd.MultiIndex)
+        or list(target_weights.index.names) != ["date", "symbol"]
+    ):
+        raise ValueError(
+            "target_weights must use a MultiIndex named ['date', 'symbol']"
+        )
+
+    target = target_weights.unstack("symbol").sort_index().fillna(0.0)
+    if force_final_zero and not np.allclose(
+        target.iloc[-1].to_numpy(dtype=float), 0.0
+    ):
+        raise ValueError(
+            "force_final_zero requires an all-zero final target row"
+        )
+
+    previous = pd.Series(0.0, index=target.columns, dtype=float)
+    rows: list[pd.Series] = []
+    diagnostics: list[dict[str, object]] = []
+
+    for i, (date, desired) in enumerate(target.iterrows()):
+        terminal = bool(force_final_zero and i == len(target) - 1)
+        if terminal:
+            current = pd.Series(0.0, index=target.columns, dtype=float)
+            actual_turnover = float((current - previous).abs().sum())
+            info = {
+                "solver_success": True,
+                "used_fallback": False,
+                "message": "forced_terminal_liquidation",
+                "desired_turnover": actual_turnover,
+                "actual_turnover": actual_turnover,
+                "tracking_error": 0.0,
+                "active_fraction": 1.0 if actual_turnover > 0 else 0.0,
+                "held_fraction": 0.0 if actual_turnover > 0 else 1.0,
+                "ignored_l1_fraction": 0.0,
+                "no_discretionary_trade": False,
+            }
+        else:
+            current, info = no_trade_band_projection(
+                desired,
+                previous,
+                no_trade_band=no_trade_band,
+                gross_limit=gross_limit,
+                max_abs_weight=max_abs_weight,
+            )
+
+        current.name = date
+        rows.append(current)
+        diagnostics.append(
+            {
+                "date": pd.Timestamp(date),
+                **info,
+                "terminal_liquidation": terminal,
+            }
+        )
+        previous = current
+
+    wide = pd.DataFrame(rows, index=target.index)
+    out = wide.stack()
+    out.index = out.index.set_names(["date", "symbol"])
+    diag = pd.DataFrame(diagnostics).set_index("date")
+    return out.sort_index().rename(target_weights.name or "weight"), diag
