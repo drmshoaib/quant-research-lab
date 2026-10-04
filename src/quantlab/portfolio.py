@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
+from scipy.optimize import Bounds, LinearConstraint, minimize
 
 
 def rank_weights(
@@ -27,6 +27,249 @@ def rank_weights(
     out = pd.Series(0.0, index=scores.index, dtype=float)
     out.loc[w.index] = w
     return out
+
+
+def turnover_budget_projection(
+    target: pd.Series,
+    previous: pd.Series | None,
+    *,
+    turnover_budget: float,
+    gross_limit: float = 1.0,
+    max_abs_weight: float = 0.08,
+    tolerance: float = 1e-7,
+) -> tuple[pd.Series, dict[str, object]]:
+    """Project a target portfolio onto an exact L1 turnover budget.
+
+    The convex programme minimises squared Euclidean distance to the target
+    subject to dollar neutrality, gross exposure, per-name bounds and
+    sum(abs(w - w_prev)) <= turnover_budget.
+
+    Absolute-value constraints are represented with auxiliary variables, so the
+    SLSQP problem has a smooth quadratic objective and linear constraints.
+    """
+    if turnover_budget <= 0:
+        raise ValueError("turnover_budget must be positive")
+    t = target.astype(float).copy()
+    p = (
+        pd.Series(0.0, index=t.index, dtype=float)
+        if previous is None
+        else previous.reindex(t.index).fillna(0.0).astype(float)
+    )
+    if len(t) < 2:
+        raise ValueError("target must contain at least two assets")
+
+    desired_turnover = float((t - p).abs().sum())
+    if desired_turnover <= turnover_budget + tolerance:
+        info = {
+            "solver_success": True,
+            "used_fallback": False,
+            "message": "target_within_budget",
+            "desired_turnover": desired_turnover,
+            "actual_turnover": desired_turnover,
+            "tracking_error": 0.0,
+            "binding": bool(abs(desired_turnover - turnover_budget) <= 1e-6),
+        }
+        return t.rename(target.name or "weight"), info
+
+    n = len(t)
+    target_values = t.to_numpy(dtype=float)
+    prev_values = p.to_numpy(dtype=float)
+
+    # x = [w (n), turnover auxiliaries u (n), gross auxiliaries g (n)]
+    x0 = np.concatenate(
+        [
+            prev_values,
+            np.zeros(n, dtype=float),
+            np.abs(prev_values),
+        ]
+    )
+
+    lower = np.concatenate(
+        [
+            np.full(n, -max_abs_weight),
+            np.zeros(n),
+            np.zeros(n),
+        ]
+    )
+    upper = np.concatenate(
+        [
+            np.full(n, max_abs_weight),
+            np.full(n, turnover_budget),
+            np.full(n, gross_limit),
+        ]
+    )
+
+    rows: list[np.ndarray] = []
+    lbs: list[float] = []
+    ubs: list[float] = []
+
+    # u_i >= |w_i - prev_i|
+    for i in range(n):
+        row = np.zeros(3 * n)
+        row[i] = -1.0
+        row[n + i] = 1.0
+        rows.append(row)
+        lbs.append(-prev_values[i])
+        ubs.append(np.inf)
+
+        row = np.zeros(3 * n)
+        row[i] = 1.0
+        row[n + i] = 1.0
+        rows.append(row)
+        lbs.append(prev_values[i])
+        ubs.append(np.inf)
+
+    # g_i >= |w_i|
+    for i in range(n):
+        row = np.zeros(3 * n)
+        row[i] = -1.0
+        row[2 * n + i] = 1.0
+        rows.append(row)
+        lbs.append(0.0)
+        ubs.append(np.inf)
+
+        row = np.zeros(3 * n)
+        row[i] = 1.0
+        row[2 * n + i] = 1.0
+        rows.append(row)
+        lbs.append(0.0)
+        ubs.append(np.inf)
+
+    row = np.zeros(3 * n)
+    row[n : 2 * n] = 1.0
+    rows.append(row)
+    lbs.append(-np.inf)
+    ubs.append(turnover_budget)
+
+    row = np.zeros(3 * n)
+    row[2 * n :] = 1.0
+    rows.append(row)
+    lbs.append(-np.inf)
+    ubs.append(gross_limit)
+
+    inequality = LinearConstraint(np.vstack(rows), np.asarray(lbs), np.asarray(ubs))
+    neutrality_row = np.zeros((1, 3 * n))
+    neutrality_row[0, :n] = 1.0
+    neutrality = LinearConstraint(neutrality_row, np.array([0.0]), np.array([0.0]))
+
+    tiny = 1e-10
+
+    def objective(x: np.ndarray) -> float:
+        w = x[:n]
+        return float(np.square(w - target_values).sum() + tiny * x[n:].sum())
+
+    def gradient(x: np.ndarray) -> np.ndarray:
+        grad = np.full(3 * n, tiny, dtype=float)
+        grad[:n] = 2.0 * (x[:n] - target_values)
+        return grad
+
+    result = minimize(
+        objective,
+        x0,
+        jac=gradient,
+        method="SLSQP",
+        bounds=Bounds(lower, upper),
+        constraints=[inequality, neutrality],
+        options={"maxiter": 300, "ftol": 1e-12, "disp": False},
+    )
+
+    candidate = pd.Series(result.x[:n], index=t.index, dtype=float)
+    actual_turnover = float((candidate - p).abs().sum())
+    neutral_error = abs(float(candidate.sum()))
+    gross = float(candidate.abs().sum())
+    cap = float(candidate.abs().max())
+
+    feasible = bool(
+        result.success
+        and actual_turnover <= turnover_budget + tolerance
+        and neutral_error <= tolerance
+        and gross <= gross_limit + tolerance
+        and cap <= max_abs_weight + tolerance
+    )
+
+    used_fallback = False
+    message = str(result.message)
+    if not feasible:
+        used_fallback = True
+        alpha = min(1.0, turnover_budget / desired_turnover)
+        candidate = p + alpha * (t - p)
+        actual_turnover = float((candidate - p).abs().sum())
+        message = f"fallback_proportional_after: {result.message}"
+
+    tracking_error = float(np.sqrt(np.square(candidate.to_numpy() - target_values).sum()))
+    info = {
+        "solver_success": feasible,
+        "used_fallback": used_fallback,
+        "message": message,
+        "desired_turnover": desired_turnover,
+        "actual_turnover": actual_turnover,
+        "tracking_error": tracking_error,
+        "binding": bool(abs(actual_turnover - turnover_budget) <= 1e-6),
+    }
+    return candidate.rename(target.name or "weight"), info
+
+
+def turnover_budget_path(
+    target_weights: pd.Series,
+    *,
+    turnover_budget: float,
+    gross_limit: float = 1.0,
+    max_abs_weight: float = 0.08,
+    force_final_zero: bool = False,
+) -> tuple[pd.Series, pd.DataFrame]:
+    """Apply the turnover-budget projection causally through time."""
+    if target_weights.empty:
+        return target_weights.copy(), pd.DataFrame()
+    if not isinstance(target_weights.index, pd.MultiIndex) or list(target_weights.index.names) != ["date", "symbol"]:
+        raise ValueError("target_weights must use a MultiIndex named ['date', 'symbol']")
+
+    target = target_weights.unstack("symbol").sort_index().fillna(0.0)
+    if force_final_zero and not np.allclose(target.iloc[-1].to_numpy(dtype=float), 0.0):
+        raise ValueError("force_final_zero requires an all-zero final target row")
+
+    previous = pd.Series(0.0, index=target.columns, dtype=float)
+    rows: list[pd.Series] = []
+    diagnostics: list[dict[str, object]] = []
+
+    for i, (date, desired) in enumerate(target.iterrows()):
+        terminal = bool(force_final_zero and i == len(target) - 1)
+        if terminal:
+            current = pd.Series(0.0, index=target.columns, dtype=float)
+            actual_turnover = float((current - previous).abs().sum())
+            info = {
+                "solver_success": True,
+                "used_fallback": False,
+                "message": "forced_terminal_liquidation",
+                "desired_turnover": actual_turnover,
+                "actual_turnover": actual_turnover,
+                "tracking_error": 0.0,
+                "binding": False,
+            }
+        else:
+            current, info = turnover_budget_projection(
+                desired,
+                previous,
+                turnover_budget=turnover_budget,
+                gross_limit=gross_limit,
+                max_abs_weight=max_abs_weight,
+            )
+
+        current.name = date
+        rows.append(current)
+        diagnostics.append(
+            {
+                "date": pd.Timestamp(date),
+                **info,
+                "terminal_liquidation": terminal,
+            }
+        )
+        previous = current
+
+    wide = pd.DataFrame(rows, index=target.index)
+    out = wide.stack()
+    out.index = out.index.set_names(["date", "symbol"])
+    diag = pd.DataFrame(diagnostics).set_index("date")
+    return out.sort_index().rename(target_weights.name or "weight"), diag
 
 
 def optimise_weights(
