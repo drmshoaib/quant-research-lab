@@ -13,7 +13,7 @@ from quantlab.metrics import backtest_summary, rank_ic_by_date, rank_ic_diagnost
 from quantlab.pipeline import prepare_research_frame, walk_forward_predictions
 from quantlab.portfolio import turnover_budget_path
 from quantlab.splits import load_date_manifest
-from quantlab.targets import next_open_to_open_return
+from quantlab.targets import next_open_to_open_simple_return
 
 
 PRUNED8 = [
@@ -92,7 +92,7 @@ def main() -> None:
         holdout_purge_days=int(cfg.get("holdout_purge_days", int(cfg["horizon"]) + 1)),
         min_assets=int(cfg.get("min_assets", 8)),
     )
-    realized = next_open_to_open_return(panel)
+    realized = next_open_to_open_simple_return(panel)
     realized_dates = pd.DatetimeIndex(
         realized.dropna().index.get_level_values("date").unique()
     ).sort_values()
