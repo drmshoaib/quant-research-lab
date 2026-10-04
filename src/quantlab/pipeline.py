@@ -7,7 +7,7 @@ import pandas as pd
 from .features import FEATURE_COLUMNS, build_features
 from .models import make_model
 from .splits import PurgedWalkForward, development_and_holdout_dates, select_dates
-from .targets import forward_relative_return
+from .targets import eligible_decision_dates, forward_relative_return
 
 
 @dataclass
@@ -15,15 +15,63 @@ class ResearchFrames:
     frame: pd.DataFrame
     development_dates: pd.DatetimeIndex
     holdout_dates: pd.DatetimeIndex
+    embargo_dates: pd.DatetimeIndex
 
 
-def prepare_research_frame(panel: pd.DataFrame, *, horizon: int, holdout_days: int) -> ResearchFrames:
+def prepare_research_frame(
+    panel: pd.DataFrame,
+    *,
+    horizon: int,
+    holdout_days: int | None = None,
+    holdout_dates: pd.DatetimeIndex | None = None,
+    holdout_purge_days: int | None = None,
+    min_assets: int = 8,
+) -> ResearchFrames:
+    """Build the modelling frame while keeping the hold-out calendar feature-independent."""
+    if horizon < 1:
+        raise ValueError("horizon must be >= 1")
+    if holdout_purge_days is None:
+        holdout_purge_days = horizon + 1
+    if holdout_purge_days < horizon:
+        raise ValueError("holdout_purge_days must be at least the prediction horizon")
+
     X = build_features(panel)
     y = forward_relative_return(panel, horizon=horizon)
+    eligible = eligible_decision_dates(panel, horizon=horizon, min_assets=min_assets)
+
+    if holdout_dates is None:
+        if holdout_days is None:
+            raise ValueError("provide holdout_days or an explicit holdout_dates manifest")
+        _, holdout = development_and_holdout_dates(eligible, holdout_days=holdout_days)
+    else:
+        holdout = pd.DatetimeIndex(pd.to_datetime(holdout_dates).unique()).sort_values()
+        if holdout.empty:
+            raise ValueError("holdout_dates is empty")
+        if holdout_days is not None and len(holdout) != holdout_days:
+            raise ValueError("holdout manifest length does not match holdout_days")
+        missing = holdout.difference(eligible)
+        if len(missing):
+            raise ValueError(f"holdout manifest contains ineligible dates: {list(missing[:3])}")
+        expected_tail = eligible[-len(holdout) :]
+        if not holdout.equals(expected_tail):
+            raise ValueError("holdout manifest is not the final eligible block of the frozen data window")
+
+    before_holdout = eligible[eligible < holdout[0]]
+    if len(before_holdout) <= holdout_purge_days:
+        raise ValueError("insufficient pre-holdout dates after applying the holdout embargo")
+    embargo = before_holdout[-holdout_purge_days:]
+    development_eligible = before_holdout[:-holdout_purge_days]
+
     frame = X.join(y).dropna().sort_index()
-    dates = pd.DatetimeIndex(frame.index.get_level_values("date").unique()).sort_values()
-    dev, holdout = development_and_holdout_dates(dates, holdout_days=holdout_days)
-    return ResearchFrames(frame=frame, development_dates=dev, holdout_dates=holdout)
+    frame_dates = pd.DatetimeIndex(frame.index.get_level_values("date").unique()).sort_values()
+    development = development_eligible.intersection(frame_dates)
+
+    return ResearchFrames(
+        frame=frame,
+        development_dates=development,
+        holdout_dates=holdout,
+        embargo_dates=embargo,
+    )
 
 
 def walk_forward_predictions(

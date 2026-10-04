@@ -17,7 +17,7 @@ The v0.2 universe is the 30-symbol ETF universe in `data/universe_etf.csv`. It i
 The research data window is frozen as:
 
 - start: 1 January 2010;
-- end: 3 October 2026, exclusive in the Yahoo adapter, so the last eligible US session is 2 October 2026.
+- end: 3 October 2026, exclusive in the Yahoo adapter, so the last intended US session is 2 October 2026.
 
 The data end date must not roll forward during v0.2.
 
@@ -27,9 +27,11 @@ No empirical result may be compared across data snapshots unless the snapshot ch
 
 ## 3. Hold-out definition
 
-The final hold-out consists of the last 252 eligible decision dates from the frozen market-data calendar.
+The final hold-out consists of the last 252 eligible decision dates from the frozen market-data/target calendar.
 
-The hold-out calendar must be generated once from the frozen data snapshot, persisted as a manifest, and then treated as immutable. It must not be recomputed from a changing feature matrix because feature-specific missingness could otherwise move the boundary.
+The hold-out calendar is generated once from the frozen data snapshot, persisted in `configs/holdout_dates.csv`, and then treated as immutable. It is defined before feature engineering, so feature-specific missingness cannot move the boundary.
+
+A six-decision-date ((h+1)) embargo immediately before the hold-out is excluded from development. This prevents development labels and portfolio sleeves from overlapping the hold-out outcome path.
 
 No model fitting, feature selection, threshold choice, hyperparameter choice, cost calibration or portfolio rule may use hold-out outcomes.
 
@@ -44,13 +46,13 @@ At decision date (t):
 - for horizon (h=5), the raw target is
 
 [
-y_{i,t}^{raw}=logleft(rac{O_{i,t+h+1}}{O_{i,t+1}}ight);
+y_{i,t}^{raw}=\log\left(\frac{O_{i,t+h+1}}{O_{i,t+1}}\right);
 ]
 
 - the modelling target is the same-date cross-sectional relative return
 
 [
-y_{i,t}=y_{i,t}^{raw}-rac{1}{N_t}sum_{j=1}^{N_t}y_{j,t}^{raw}.
+y_{i,t}=y_{i,t}^{raw}-\frac{1}{N_t}\sum_{j=1}^{N_t}y_{j,t}^{raw}.
 ]
 
 All target calculations remain outside the feature pipeline.
@@ -62,7 +64,8 @@ Development evaluation uses expanding purged walk-forward validation with:
 - minimum training history: 756 decision dates;
 - test block: 63 decision dates;
 - step: 63 decision dates;
-- purge: (h+1=6) decision dates;
+- train/test purge: (h+1=6) decision dates;
+- pre-hold-out embargo: (h+1=6) decision dates;
 - no hold-out observations in any development fold.
 
 The primary baseline models remain:
@@ -108,23 +111,22 @@ A signal is not promoted on aggregate IC alone. It must also have reasonable tem
 
 ## 8. Portfolio translation
 
-A 5-session forecast must be evaluated with a horizon-consistent portfolio.
+A 5-session forecast is evaluated with a horizon-consistent portfolio.
 
-The v0.2 implementation will use five staggered sleeves:
+The v0.2 implementation uses five staggered sleeves:
 
 - each decision date creates one cohort from that day's scores;
 - the cohort enters at the next open;
-- it is held for five sessions;
+- it remains active for five one-session open-to-open return periods;
+- each cohort receives (1/5) of portfolio capital;
 - five overlapping cohorts are active in steady state;
-- the live portfolio is the equal-capital average of the active cohorts.
-
-This removes the v0.1 mismatch in which a 5-session prediction was scored through a one-session trading return.
+- after the final development signal, existing sleeves run off during the pre-hold-out embargo.
 
 The baseline portfolio remains:
 
 - dollar neutral;
 - gross exposure limit: 1.0;
-- per-name absolute weight cap: 0.08;
+- per-name absolute weight cap: 0.08 at the cohort level;
 - rank-based construction;
 - no covariance optimiser in the primary v0.2 result.
 
@@ -135,12 +137,12 @@ The existing optimiser is reserved for the later optimisation phase so signal di
 The base assumption is 5 basis points one way, charged on actual traded notional:
 
 [
-C_t = csum_i |w_{i,t}-w_{i,t-1}|.
+C_t = c\sum_i |w_{i,t}-w_{i,t-1}|.
 ]
 
 Cost sensitivity must be reported at 0, 2, 5, 10 and 20 bps.
 
-Turnover must be computed from the horizon-consistent composite portfolio, not from a one-day proxy.
+Turnover is computed from the horizon-consistent composite portfolio.
 
 ## 10. Performance reporting
 

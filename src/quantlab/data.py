@@ -36,6 +36,8 @@ def load_panel_csv(path: str | Path) -> pd.DataFrame:
 
 
 def save_panel_csv(panel: pd.DataFrame, path: str | Path) -> None:
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     validate_panel(panel).reset_index().to_csv(path, index=False)
 
 
@@ -51,10 +53,15 @@ def download_yahoo(
     start: str,
     end: str | None = None,
 ) -> pd.DataFrame:
-    """Download OHLCV from Yahoo through yfinance, imported lazily.
+    """Download split/dividend-adjusted OHLCV from Yahoo through yfinance.
 
-    This is a convenience adapter for the public research project. The core
-    research code is provider-agnostic and can consume any long OHLCV CSV.
+    yfinance's auto_adjust=True applies the adjustment ratio to OHLC prices.
+    This keeps long-horizon price features and targets from treating splits or
+    cash distributions as tradable return shocks.
+
+    The core research code remains provider-agnostic and can consume any long
+    OHLCV CSV whose adjustment convention is documented and internally
+    consistent.
     """
     try:
         import yfinance as yf  # type: ignore
@@ -69,7 +76,7 @@ def download_yahoo(
         tickers=tickers,
         start=start,
         end=end,
-        auto_adjust=False,
+        auto_adjust=True,
         actions=False,
         group_by="ticker",
         progress=False,

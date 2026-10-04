@@ -39,6 +39,25 @@ def forward_relative_return(panel: pd.DataFrame, horizon: int = 5) -> pd.Series:
     return out
 
 
+def eligible_decision_dates(
+    panel: pd.DataFrame,
+    *,
+    horizon: int,
+    min_assets: int = 8,
+) -> pd.DatetimeIndex:
+    """Decision dates with enough observable forward returns for inference.
+
+    This calendar depends only on market data and target timing. It is therefore
+    suitable for freezing the hold-out independently of feature missingness.
+    """
+    if min_assets < 2:
+        raise ValueError("min_assets must be >= 2")
+    raw = forward_open_return(panel, horizon=horizon)
+    counts = raw.notna().groupby(level="date").sum()
+    dates = counts.index[counts >= min_assets]
+    return pd.DatetimeIndex(pd.to_datetime(dates)).sort_values()
+
+
 def next_open_to_open_return(panel: pd.DataFrame) -> pd.Series:
     """One-session realised log return for a position chosen at decision date t."""
     return forward_open_return(panel, horizon=1).rename("realized_return")
