@@ -96,7 +96,7 @@ def backtest_summary(daily: pd.DataFrame) -> dict[str, float]:
     ann_return = float(r.mean() * 252.0)
     ann_vol = float(r.std(ddof=1) * np.sqrt(252.0))
     sharpe = ann_return / ann_vol if ann_vol > 0 else math.nan
-    equity = np.exp(r.cumsum())
+    equity = (1.0 + r).cumprod()
     drawdown = equity / equity.cummax() - 1.0
     avg_turnover = float(daily["turnover"].mean())
     return {
