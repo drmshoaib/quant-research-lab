@@ -23,7 +23,7 @@ def test_staggered_sleeves_match_horizon_and_run_off():
 
     live = staggered_weights(cohort, horizon=2, decision_dates=dates)
     got = live.xs("A", level="symbol")
-    expected = pd.Series([0.5, 1.0, 1.0, 0.5], index=dates[:4], name="weight")
+    expected = pd.Series([0.5, 1.0, 1.0, 0.5], index=dates[:4], name="weight")\n    expected.index.name = "date"
     pd.testing.assert_series_equal(got, expected, check_freq=False)
 
     ridx = pd.MultiIndex.from_product([dates[:4], ["A"]], names=["date", "symbol"])
