@@ -56,6 +56,11 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def cost_key(cost: float) -> str:
+    value = float(cost)
+    return str(int(value)) if value.is_integer() else str(value)
+
+
 def evaluate_weights(
     weights: pd.Series,
     realized: pd.Series,
@@ -66,9 +71,10 @@ def evaluate_weights(
     base = None
     for cost in costs:
         bt = run_backtest(weights, realized, cost_bps=float(cost))
-        cost_sensitivity[str(cost)] = backtest_summary(bt)
+        key = cost_key(cost)
+        cost_sensitivity[key] = backtest_summary(bt)
         if float(cost) == float(base_cost):
-            base = cost_sensitivity[str(cost)]
+            base = cost_sensitivity[key]
     if base is None:
         base = backtest_summary(run_backtest(weights, realized, cost_bps=float(base_cost)))
     return {"base_cost": base, "cost_sensitivity": cost_sensitivity}
