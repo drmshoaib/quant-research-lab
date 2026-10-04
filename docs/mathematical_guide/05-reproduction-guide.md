@@ -1,21 +1,17 @@
 # Part 5 — Reproducing the Research in Python
 
-This part turns the mathematics into an executable workflow.
-
-The objective is not merely to obtain similar-looking numbers. A valid reproduction must preserve the timing, data snapshot, hold-out, model and statistical protocol.
+This part turns the mathematics into an executable workflow. A valid reproduction must preserve not only the code but also the timing convention, frozen data, universe, hold-out, model and statistical protocol.
 
 ## 1. Repository structure
-
-The most important directories are:
 
 | Path | Purpose |
 |---|---|
 | [src/quantlab](../../src/quantlab) | reusable research library |
 | [scripts](../../scripts) | experiment entry points |
 | [configs](../../configs) | frozen settings, hold-out and snapshot metadata |
-| [data](../../data) | ETF universe definition |
+| [data](../../data) | ETF universe |
 | [docs](../../docs) | protocol, results and research notes |
-| [tests](../../tests) | mathematical and implementation checks |
+| [tests](../../tests) | mathematical and software invariants |
 | [.github/workflows](../../.github/workflows) | reproducible GitHub Actions runs |
 
 ## 2. Create a Python environment
@@ -28,147 +24,109 @@ source .venv/bin/activate
 pip install -e '.[dev,data]'
 ~~~
 
-On Windows PowerShell the activation command is different, but the package installation is the same.
-
-The editable installation means changes in src/quantlab are immediately visible to the scripts.
-
-## 3. Run the test suite first
+Run the test suite before any experiment:
 
 ~~~bash
 pytest
 ~~~
 
-A research result should not be reproduced from code whose invariants are failing.
-
 Important test groups include:
 
-- [test_features.py](../../tests/test_features.py): future data must not change past features;
-- [test_targets.py](../../tests/test_targets.py): next-open timing and arithmetic portfolio returns;
+- [test_features.py](../../tests/test_features.py): future values must not alter past features;
+- [test_targets.py](../../tests/test_targets.py): next-open target timing and arithmetic portfolio returns;
 - [test_splits.py](../../tests/test_splits.py): purging and date manifests;
-- [test_pipeline.py](../../tests/test_pipeline.py): hold-out locking and embargo behaviour;
+- [test_pipeline.py](../../tests/test_pipeline.py): hold-out locking and embargo logic;
 - [test_backtest.py](../../tests/test_backtest.py): staggered sleeves, costs, liquidation and compounding;
-- [test_portfolio.py](../../tests/test_portfolio.py): neutrality, gross limits and optimisation;
-- [test_robustness.py](../../tests/test_robustness.py): permutation and robustness machinery;
+- [test_portfolio.py](../../tests/test_portfolio.py): neutrality, exposure limits and optimisation;
+- [test_robustness.py](../../tests/test_robustness.py): permutation and robustness logic;
 - [test_group_neutral.py](../../tests/test_group_neutral.py): group-neutral calculations.
 
-These tests are part of the mathematical specification, not just software housekeeping.
+The tests are part of the mathematical specification, not merely software housekeeping.
 
-## 4. Frozen configuration
+## 3. Frozen numerical configuration
 
-The main numerical settings live in [configs/baseline.json](../../configs/baseline.json).
+The main settings are in [configs/baseline.json](../../configs/baseline.json).
 
-Key values are:
+Key values are
 
-\[
-h=5,
-\quad
-minAssets=8,
-\quad
-minTrain=756,
-\quad
-test=63,
-\quad
-step=63,
-\]
+$$
+h=5,\quad minAssets=8,\quad minTrain=756,
+$$
 
-\[
-holdout=252,
-\quad
-purge=6,
-\quad
-cost=5\text{ bps},
-\quad
-gross=1,
-\quad
-max|w_i|=0.08.
-\]
+$$
+test=63,\quad step=63,\quad holdout=252,\quad purge=6,
+$$
 
-The final frozen specification is in [configs/final_specification_v0.2.json](../../configs/final_specification_v0.2.json).
+and
 
-## 5. Frozen universe
+$$
+cost=5\text{ bps},\quad gross=1,\quad \max_i|w_i|=0.08.
+$$
 
-The ETF list and taxonomy are in [data/universe_etf.csv](../../data/universe_etf.csv).
+The final specification is in [configs/final_specification_v0.2.json](../../configs/final_specification_v0.2.json).
 
-The 30 symbols span:
+## 4. Frozen universe
 
-- broad US equities;
-- US sectors;
-- international equity;
-- government bonds;
-- corporate credit;
-- commodities;
-- real estate;
-- biotechnology;
-- retail.
+The exact 30-symbol universe and taxonomy are in [data/universe_etf.csv](../../data/universe_etf.csv).
 
-Do not silently add or remove symbols if you want to reproduce the official v0.2 experiment.
+Do not silently add or remove symbols if the aim is to reproduce v0.2.
 
-## 6. Frozen market data
+The fixed ETF design reduces one constituent-membership survivorship problem, but the ETF set itself is still selected ex post. Reproduction means using the same universe, not claiming that the universe is unbiased.
 
-The official data snapshot is described in [configs/data_snapshot.json](../../configs/data_snapshot.json).
+## 5. Frozen data snapshot
 
-The large market-data CSV is not committed as an ordinary repository file. It was frozen as a workflow artifact and verified with a SHA-256 checksum.
+The official market-data snapshot is described in [configs/data_snapshot.json](../../configs/data_snapshot.json).
 
-Official snapshot checksum:
+Its SHA-256 checksum is
 
-\[
-\text{ec782ac2cd812a6d81abcbf9cbcdecdd448ab8822b585fbd07c3a74968a3bbd3}.
-\]
+~~~
+ec782ac2cd812a6d81abcbf9cbcdecdd448ab8822b585fbd07c3a74968a3bbd3
+~~~
 
-The original freeze workflow is [.github/workflows/freeze-holdout.yml](../../.github/workflows/freeze-holdout.yml).
+The large CSV was stored as a workflow artifact rather than committed as ordinary source.
 
-To reproduce the **official** numbers, use the byte-identical frozen snapshot rather than redownloading Yahoo data later. A fresh Yahoo download may be revised by the provider.
+To reproduce the **official** results, use the byte-identical frozen snapshot. A new Yahoo download at a later date may contain provider revisions.
 
-## 7. Why checksums matter
+### Why a checksum matters
 
-A cryptographic hash is a deterministic fingerprint of a file.
+A cryptographic hash is a deterministic fingerprint. If the checksum changes, the research input is not byte-identical.
 
-If
+Financial data vendors may revise adjusted historical series, so a frozen checksum makes the input auditable.
 
-\[
-SHA256(file_A)=SHA256(file_B),
-\]
+## 6. Hold-out manifest
 
-then, for practical reproducibility purposes, the files can be treated as byte-identical.
+The final 252 eligible decision dates are explicitly stored in [configs/holdout_dates.csv](../../configs/holdout_dates.csv).
 
-If the checksum differs, the dataset is not the same research input.
+The development code checks that the manifest is the final eligible block of the frozen target calendar.
 
-This is important because financial vendors can revise historical data.
+Do not regenerate or replace it during ordinary reproduction.
 
-## 8. Hold-out manifest
+The original freeze procedure is implemented in [scripts/freeze_holdout.py](../../scripts/freeze_holdout.py).
 
-The hold-out dates are stored explicitly in [configs/holdout_dates.csv](../../configs/holdout_dates.csv).
+## 7. Reproducing the freeze procedure separately
 
-The manifest contains 252 ordered dates.
+If you want to understand how the hold-out was created, use a separate output path or copy of the repository.
 
-The development scripts verify that the manifest is the final eligible block of the frozen calendar.
+Conceptually the script:
 
-The hold-out should not be regenerated during reproduction unless you are reproducing the **freeze procedure itself**.
+1. loads adjusted OHLCV;
+2. computes eligible target dates;
+3. takes the final 252 dates;
+4. writes the ordered manifest.
 
-## 9. Reproducing the freeze procedure separately
-
-The script is [scripts/freeze_holdout.py](../../scripts/freeze_holdout.py).
-
-Conceptually it performs:
-
-1. load/download adjusted panel;
-2. compute eligible target dates;
-3. split off the last 252;
-4. save them as a manifest.
-
-A generic command is:
+Generic command:
 
 ~~~bash
 python scripts/freeze_holdout.py --data path/to/adjusted_ohlcv.csv
 ~~~
 
-Do not overwrite the committed v0.2 manifest when reproducing the existing research.
+Do not overwrite the committed v0.2 manifest when reproducing the existing study.
 
-## 10. Baseline experiment flow
+## 8. Main baseline flow
 
-The baseline runner is [scripts/run_baseline.py](../../scripts/run_baseline.py).
+Runner: [scripts/run_baseline.py](../../scripts/run_baseline.py).
 
-With the frozen CSV available locally:
+With the frozen data available:
 
 ~~~bash
 python scripts/run_baseline.py \
@@ -176,29 +134,26 @@ python scripts/run_baseline.py \
   --output-dir outputs/reproduction/exp001
 ~~~
 
-The script performs roughly:
+The script performs:
 
 ~~~text
-load config
-load hold-out manifest
-load frozen OHLCV panel
-prepare research frame
-compute simple realised portfolio returns
+load config and hold-out manifest
+load frozen adjusted OHLCV
+prepare leakage-safe research frame
+compute arithmetic realised portfolio returns
 
 for each model:
-    create walk-forward predictions
-    calculate daily rank IC
-    calculate HAC diagnostics
-    convert scores to cohort weights
-    combine five staggered sleeves
+    generate purged walk-forward predictions
+    compute daily rank IC
+    compute HAC and temporal diagnostics
+    convert scores to rank weights
+    construct five staggered sleeves
     append terminal liquidation
     backtest at several transaction costs
-    save predictions, IC and summaries
+    save predictions, IC and summary files
 ~~~
 
-## 11. Library call chain
-
-For the main five-session experiment, the important function chain is:
+## 9. Main function chain
 
 ~~~text
 load_panel_csv
@@ -225,246 +180,235 @@ run_backtest
 backtest_summary
 ~~~
 
-Following this chain is one of the best ways to understand the codebase.
+Trace this chain while reading Parts 1–4.
 
-## 12. EXP-001: baseline linear versus nonlinear model
+## 10. EXP-001 — linear versus nonlinear baseline
 
 Runner: [scripts/run_baseline.py](../../scripts/run_baseline.py).
 
-Research question:
+Question:
 
-> does a simple Ridge model produce a defensible cross-sectional signal, and how does a fixed nonlinear comparator behave?
+> does a simple Ridge model produce a defensible cross-sectional ranking signal, and how does the fixed nonlinear comparator behave?
 
-The Ridge hypothesis failed. HistGradientBoosting became the development candidate.
+Ridge failed the pre-registered primary hypothesis. HistGradientBoosting became the development candidate.
 
-Outputs include:
+Typical outputs include predictions, daily IC, cohort weights, live weights, backtest rows and a JSON summary.
 
-- prediction CSV;
-- daily rank IC CSV;
-- cohort weights;
-- live weights;
-- backtest;
-- JSON summary.
-
-## 13. EXP-002: feature attribution and score smoothing
+## 11. EXP-002 — feature attribution and score smoothing
 
 Runner: [scripts/run_exp002.py](../../scripts/run_exp002.py).
 
-Two main mathematical operations:
-
 ### Leave-one-feature-out ablation
 
-Fit the full model and nine ablated models, each omitting one feature.
+For each feature $j$, compare
 
-Compare paired IC series and apply BH FDR control.
+$$
+IC_t^{full}
+$$
 
-### EWMA smoothing
+with
 
-Transform scores to daily ranks and causally smooth each symbol's ranked score path.
+$$
+IC_t^{(-j)}.
+$$
 
-The experiment asks whether turnover can fall without destroying signal and net return.
+The paired loss is
 
-No smoothing span passed every registered gate.
+$$
+D_{j,t}=IC_t^{full}-IC_t^{(-j)}.
+$$
 
-## 14. EXP-003: reduced feature sets and partial adjustment
+HAC inference is applied to the loss series, and BH FDR correction is applied across the family of feature tests.
+
+### EWMA score smoothing
+
+Daily scores are first converted to centred cross-sectional ranks. Each symbol's rank path is then causally smoothed.
+
+No smoothing span passed all registered signal, turnover and net-return gates.
+
+## 12. EXP-003 — reduced features and partial adjustment
 
 Runner: [scripts/run_exp003.py](../../scripts/run_exp003.py).
 
-Feature specifications include:
+Compared feature sets include full9, core2, core3 and pruned8.
 
-- full9;
-- core2;
-- core3;
-- pruned8.
+Pruned8 became the frozen feature specification because it was the only reduced model satisfying all registered statistical eligibility rules.
 
-The experiment established pruned8 as the only reduced specification passing all registered statistical eligibility conditions.
+The same experiment tested partial-adjustment execution. No adjustment rate was promoted.
 
-It also tests partial adjustment rates for portfolio inertia.
-
-No partial-adjustment rule was promoted.
-
-## 15. EXP-004: explicit turnover budgets
+## 13. EXP-004 — turnover-budget projection
 
 Runner: [scripts/run_exp004.py](../../scripts/run_exp004.py).
 
-Budgets:
+Budgets are
 
-\[
+$$
 B\in\{0.12,0.10,0.08\}.
-\]
+$$
 
-Each day, solve the constrained projection explained in Part 4.
+Each date solves the constrained projection described in Part 4.
 
-The corrected 0.12 budget came extremely close to the gross-return retention requirement:
+The corrected 0.12 candidate retained
 
-\[
+$$
 79.9649\%
-\]
+$$
 
-versus an 80% threshold.
+of zero-cost return against an 80% requirement.
 
-It still failed.
+It therefore remained a failure rather than being rounded into a pass.
 
-This is a useful reproducibility check because a different implementation should reach the same gate decision rather than rounding it into a pass.
-
-## 16. EXP-005: no-trade bands
+## 14. EXP-005 — no-trade bands
 
 Runner: [scripts/run_exp005.py](../../scripts/run_exp005.py).
 
-Bands:
+Bands are
 
-\[
+$$
 b\in\{0.005,0.010,0.020\}.
-\]
+$$
 
-Small target changes are ignored and the remaining active positions are projected subject to portfolio constraints.
+Small desired weight changes are held unchanged; active names are moved toward target subject to portfolio constraints.
 
-No candidate passed all turnover, retention and net-return gates.
+No candidate passed all registered gates.
 
-## 17. EXP-006: robustness and falsification
+## 15. EXP-006 — robustness and falsification
 
 Runner: [scripts/run_exp006.py](../../scripts/run_exp006.py).
 
-This experiment contains four sections:
+It contains four pre-specified robustness sections:
 
-1. horizon robustness;
+1. horizon checks;
 2. chronological thirds;
-3. asset-group dependence;
-4. symbol-identity permutation placebo.
+3. broad asset-group dependence;
+4. a 999-replicate symbol-identity permutation placebo.
 
-Important code:
+Core functions:
 
 - [prepare_horizon_research_frame](../../src/quantlab/robustness.py)
 - [chronological_ic_blocks](../../src/quantlab/robustness.py)
 - [asset_group_diagnostics](../../src/quantlab/robustness.py)
 - [global_symbol_permutation_test](../../src/quantlab/robustness.py)
 
-The experiment formally failed because the leave-US-risk-out aggregate did not meet the registered retention/significance rule.
+EXP-006 formally failed because removing the US-risk block did not satisfy the leave-one-group-out retention/significance rule.
 
-The failure is part of the result.
+A valid reproduction reproduces that negative result.
 
-## 18. EXP-007: group-neutral learning
+## 16. EXP-007 — group-neutral learning
 
 Runner: [scripts/run_exp007.py](../../scripts/run_exp007.py).
 
-The model is retrained using the group-neutral target while keeping:
-
-- the same dates;
-- the same folds;
-- the same features;
-- the same model hyperparameters.
-
-It computes within-group ICs and equal-weight group composites.
+The HistGradientBoosting model is retrained using the group-neutral target while keeping the same dates, folds, features and hyperparameters.
 
 Four of five gates passed. The non-US composite produced
 
-\[
+$$
 p=0.0501247,
-\]
+$$
 
-which is not less than 0.05.
+which is not less than the pre-registered 0.05 threshold.
 
-Again, exact reproduction includes reproducing the **failure**.
+Again, faithful reproduction includes reproducing the failure.
 
-## 19. Portfolio accounting correction
+## 17. Portfolio-accounting correction
 
-Read [docs/accounting_correction.md](../accounting_correction.md).
+Read [accounting_correction.md](../accounting_correction.md).
 
-The correction changed only the economic accounting:
+Before the final hold-out was touched, a technical audit corrected two secondary portfolio-accounting issues:
 
-- portfolio P&L now uses simple returns;
-- equity uses cumulative products of \(1+R\);
-- terminal liquidation is explicitly costed.
+1. portfolio P&L now uses simple open-to-open returns;
+2. terminal liquidation is explicitly costed.
 
-Prediction targets, scores, rank IC, model selection and robustness conclusions did not change.
+The predictive targets, model scores, rank IC, model selection and EXP-006/007 robustness results were unchanged.
 
 The correction workflow is [.github/workflows/economic-correction.yml](../../.github/workflows/economic-correction.yml).
 
-## 20. GitHub Actions as reproducible experiments
+## 18. GitHub Actions as experiment records
 
-The workflow files under [.github/workflows](../../.github/workflows) specify:
+Workflow YAML files specify:
 
 - Python version;
-- package installation;
-- data artifact retrieval;
+- dependencies;
+- frozen-data artifact retrieval;
 - checksum verification;
-- experiment command;
-- output upload.
+- exact experiment command;
+- output artifact upload.
 
-This makes an experiment more reproducible than a notebook whose cells may have been run in an unknown order.
+This provides a cleaner audit trail than a notebook whose execution order may be uncertain.
 
-For a student, the workflow YAML is worth reading alongside each experiment script.
+Read each workflow beside its matching script.
 
-## 21. What outputs should match?
+## 19. What should match?
 
-A faithful reproduction should match, up to harmless floating-point differences:
+A faithful reproduction should match, apart from negligible floating-point differences:
 
-- number of scored dates;
-- mean IC;
+- scored date counts;
+- mean rank IC;
 - HAC statistics;
 - fold and annual IC summaries;
 - experiment gate decisions;
 - portfolio turnover;
-- cost-sensitive returns;
-- selected or rejected candidate rules;
+- transaction-cost sensitivity;
+- selected/rejected execution rules;
 - permutation seed and empirical p-value.
 
-If these disagree materially, investigate before interpreting the result.
+## 20. Floating-point tolerance
 
-## 22. Floating-point differences
+Numbers such as
 
-Numerical libraries can sometimes differ slightly across operating systems or package versions.
-
-Differences such as
-
-\[
+$$
 0.02700877388
-\quad\text{versus}\quad
+$$
+
+and
+
+$$
 0.02700877387
-\]
+$$
 
-are usually immaterial.
+are practically identical.
 
-A result switching from 79.96% to 80.10%, however, would be material because it could change a registered decision.
+A difference that changes a registered gate is not.
 
-This is why environment and dependency control matter.
+For example, moving a retention result from 79.96% to 80.10% would require investigation because the research decision could change.
 
-## 23. How to trace one prediction
+## 21. How to audit one prediction row
 
-To understand one row:
+Choose one date and symbol from a predictions output.
 
-1. locate a date/symbol in a predictions CSV;
-2. inspect its OHLCV history;
-3. recompute its features from [features.py](../../src/quantlab/features.py);
-4. verify the forward target from [targets.py](../../src/quantlab/targets.py);
-5. identify its walk-forward fold;
-6. confirm the fold's training dates precede it;
-7. compare its model score with scores of other ETFs that date;
-8. compute its rank;
-9. compute the day's Spearman IC.
+Then:
 
-This transforms the pipeline from a black box into auditable mathematics.
+1. inspect its prior adjusted OHLCV;
+2. recompute its features using [features.py](../../src/quantlab/features.py);
+3. verify its future target using [targets.py](../../src/quantlab/targets.py);
+4. identify its walk-forward fold;
+5. confirm that all training dates precede the purged test block;
+6. compare its score with the other ETFs that day;
+7. calculate its rank;
+8. reproduce that day's Spearman IC.
 
-## 24. Safe extension rules
+Doing this once turns the whole pipeline from a black box into a transparent sequence of calculations.
 
-If you create a new experiment, do not immediately run dozens of variations.
+## 22. Safe extension rules
 
-A defensible extension should first specify:
+Before a new research experiment, specify:
 
-- question;
+- the question;
 - exact formula;
 - expected direction;
-- dates used;
+- data window;
 - acceptance rule;
 - multiplicity treatment;
 - whether it is exploratory or confirmatory.
 
-The repository's [research_log.md](../research_log.md) shows this discipline.
+The format is illustrated in [research_log.md](../research_log.md).
 
-## 25. Do not use the final hold-out as a debugging set
+Do not search repeatedly until a pleasing result appears.
 
-If the hold-out is opened and then the code, features or model are changed because the result was disappointing, the hold-out becomes development data.
+## 23. Never use the final hold-out as a debugging set
 
-The final test has value only because its outcomes have not guided the research process.
+If the hold-out is opened and then the model, features or thresholds are changed because the result is disappointing, the hold-out becomes development data.
 
-For learning purposes, use synthetic data or the existing development outputs to debug new code.
+For software debugging, use unit tests, synthetic data or existing development outputs.
+
+The value of the final 252 dates comes entirely from the fact that their outcomes have not guided the research.
