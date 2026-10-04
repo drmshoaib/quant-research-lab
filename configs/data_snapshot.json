@@ -1,0 +1,16 @@
+{
+  "generated_by_workflow_run": 37189218641,
+  "source_commit": "800456dedf011205737a28b1fea85b09db56776b",
+  "provider": "Yahoo/yfinance",
+  "adjustment": "auto_adjust=True",
+  "config_start": "2010-01-01",
+  "config_end_exclusive": "2026-10-03",
+  "first_date": "2010-01-04",
+  "last_date": "2026-10-02",
+  "rows": 126390,
+  "symbols": 30,
+  "sha256": "ec782ac2cd812a6d81abcbf9cbcdecdd448ab8822b585fbd07c3a74968a3bbd3",
+  "holdout_dates": 252,
+  "holdout_start": "2025-09-24",
+  "holdout_end": "2026-09-24"
+}
