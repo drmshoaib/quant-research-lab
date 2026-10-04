@@ -464,3 +464,100 @@ Current formal development benchmark: instant \`pruned8\`, recorded in EXP-003 a
 EXP-004 turnover-budget result: \`c343b89adfb5a02faadddb34339f3a0b52a7e793\`.  
 EXP-005 implementation and outputs will be added after execution.
 
+## EXP-006 — Robustness and falsification of pruned8
+
+**Date registered:** 4 October 2026  
+**Status:** proposed
+
+**Question**  
+Does the predictive rank IC of the frozen \`pruned8\` HistGradientBoosting specification survive independent challenges to horizon, time period, asset-group composition and symbol identity, or is the EXP-001–005 result plausibly an artefact of one sample/specification?
+
+**Frozen model**  
+Use the \`pruned8\` HistGradientBoosting specification selected in EXP-003:
+
+- \`ret_1\`;
+- \`mom_20\`;
+- \`mom_60\`;
+- \`vol_20\`;
+- \`vol_60\`;
+- \`range_1\`;
+- \`volume_z_20\`;
+- \`drawdown_60\`.
+
+No feature, hyperparameter or portfolio rule is selected in EXP-006. Predictive rank IC is the primary object of study. The locked 252-date hold-out remains untouched.
+
+### A. Horizon decay
+
+Refit the same frozen model and validation design at exactly four forward-return horizons:
+
+- 1 session;
+- 5 sessions (reference);
+- 10 sessions;
+- 20 sessions.
+
+For each horizon \(h\), features remain end-of-day at \(t\), execution starts at the next open, the target exits \(h\) sessions later, the train/test purge is \(h+1\) decision dates, and the pre-hold-out embargo is also \(h+1\) eligible decision dates before the fixed hold-out start of 24 September 2025.
+
+The fixed hold-out start is a boundary, not a horizon-specific tuning sample. No target used in development may overlap that boundary.
+
+Report mean/median rank IC, HAC inference using lag \(h-1\) (lag 1 for \(h=1\)), fold stability and annual stability.
+
+For the three alternate horizons \(\{1,10,20\}\), apply Benjamini-Hochberg FDR at \(q=0.10\) to their HAC p-values.
+
+**Horizon-robustness rule:** at least two of the three alternate horizons must have positive mean IC, and at least one of the adjacent horizons \(h=1\) or \(h=10\) must have positive mean IC and survive BH-FDR at \(q=0.10\). The 20-session horizon is allowed to decay.
+
+### B. Chronological subperiod stability
+
+Using only the frozen five-session out-of-sample development predictions, split the ordered scored decision dates into three consecutive blocks of as nearly equal size as possible. The split is based only on date order/count, not results.
+
+For each block report its exact date range, number of IC dates, mean rank IC and HAC test with lag 4.
+
+**Subperiod rule:** all three block mean ICs must be positive, and at least two of the three blocks must have two-sided HAC \(p<0.05\).
+
+### C. Asset-group dependence
+
+Map the existing universe taxonomy into four pre-declared broad groups:
+
+- **US risk assets:** \`US_equity\`, \`US_sector\`, \`real_estate\`, \`biotech\`, \`retail\`;
+- **International equity:** \`developed_ex_US\`, \`emerging_markets\`, \`Japan\`, \`United_Kingdom\`, \`China\`;
+- **Fixed income:** \`long_treasury\`, \`intermediate_treasury\`, \`short_treasury\`, \`investment_grade_credit\`, \`high_yield_credit\`;
+- **Commodities:** \`gold\`, \`silver\`, \`oil\`, \`agriculture\`.
+
+On the frozen five-session predictions:
+
+1. compute daily within-group rank IC for each broad group, using at least four assets;
+2. recompute aggregate daily rank IC four times, each time excluding one broad group.
+
+No model is retrained for this diagnostic.
+
+**Asset-group breadth rule:** at least three of the four broad groups must have positive mean within-group IC. In addition, every leave-one-group-out aggregate must retain at least 50% of the full-universe mean IC and remain positive with HAC \(p<0.05\), lag 4.
+
+### D. Symbol-identity placebo
+
+Use the frozen five-session predictions and targets. Preserve every symbol's complete prediction time series, each date's cross-sectional score distribution and all serial dependence, but randomly permute the mapping from prediction-symbol paths to target-symbol paths.
+
+Generate exactly 999 independent global symbol permutations with NumPy seed \`20261004\`. For each permutation compute mean daily cross-sectional Spearman rank IC over the same development dates.
+
+The one-sided empirical placebo p-value is
+
+\[
+p_{\mathrm{perm}}=
+\frac{1+\#\{\bar{IC}^{perm}\ge \bar{IC}^{obs}\}}
+{1000}.
+\]
+
+**Placebo rule:** \(p_{\mathrm{perm}}\le0.01\).
+
+### EXP-006 robustness decision
+
+The frozen pruned8 signal receives an overall **robustness pass** only if all four sections A–D pass their pre-registered rules.
+
+If EXP-006 passes, the next step is to prepare the final specification manifest and a concise research note before any hold-out evaluation. Passing EXP-006 does **not** itself authorise opening the hold-out.
+
+If any section fails, record the failure and do not alter these rules after observing the result.
+
+**Commit / output references**  
+Frozen data/hold-out: \`9dc3f66770e10159949df9c86d4743824fe94b76\`.  
+Current formal development benchmark: instant \`pruned8\`, recorded at \`ac88f152510bd04f4eb774a4746f3c1aacf2338c\`.  
+EXP-005 result: \`6593bd4ed72eb6be769f9c3fc55d5f2c667d40b5\`.  
+EXP-006 implementation and outputs will be added after execution.
+
