@@ -229,7 +229,7 @@ w_t^{(lambda)}=(1-lambda)w_{t-1}^{(lambda)}+lambda w_t^*,
 
 with (lambdain{0.50,0.25}), starting from zero weights.
 
-Because the rule is a convex combination of feasible dollar-neutral portfolios, it preserves neutrality, gross exposure and per-name bounds. Transaction costs are charged on the actual adjusted weights.
+Because the rule is a convex combination of feasible dollar-neutral portfolios, it preserves neutrality, gross exposure and per-name bounds. Transaction costs are charged on the actual adjusted weights. For all execution variants, one additional zero-weight liquidation row is appended on the next available pre-hold-out embargo decision date after the final active sleeve; partial-adjustment variants are forced exactly to zero on that row. This counts terminal trading costs and prevents residual development exposure from entering the hold-out.
 
 The unsmoothed, instant target portfolio ((lambda=1)) is the execution benchmark.
 
