@@ -276,3 +276,95 @@ Successful workflow commit: `dc359949e26188d99f0b0f69bc8ca1f23409c730`.
 Workflow run: `37191103896`.  
 Development-results artifact: `11299500822` (digest `sha256:561697fcce6519bae1f1cfad72d3f1153250a11f6994125f8a4fa9107eb339c2`).
 
+## EXP-004 — Turnover-budgeted portfolio projection
+
+**Date registered:** 4 October 2026  
+**Status:** proposed
+
+**Question**  
+Can the fast `pruned8` HistGradientBoosting signal selected in EXP-003 be expressed more efficiently by allocating a fixed daily turnover budget to the most important portfolio changes, rather than slowing every position uniformly?
+
+**Forecast specification**  
+Use the frozen `pruned8` HistGradientBoosting model from EXP-003 without changing features, hyperparameters, target, walk-forward folds, rank construction or five-sleeve horizon translation.
+
+The instantaneous five-sleeve rank portfolio (w_t^*) is the desired target.
+
+**Turnover-budgeted projection**  
+At each development date, choose the actual portfolio (w_t) by solving
+
+[
+\min_w \sum_i (w_i-w_{i,t}^*)^2
+]
+
+subject to
+
+[
+\sum_i w_i = 0,
+]
+
+[
+\sum_i |w_i| \le 1,
+]
+
+[
+|w_i| \le 0.08,
+]
+
+and
+
+[
+\sum_i |w_i-w_{i,t-1}| \le \tau.
+]
+
+The previous actual portfolio (w_{t-1}), not the previous target, defines turnover. The optimisation is causal and uses no realised returns.
+
+Test exactly three pre-declared daily L1 turnover budgets:
+
+- (	au=0.12);
+- (	au=0.10);
+- (	au=0.08).
+
+The instant pruned8 portfolio is the benchmark.
+
+The final development portfolio is forcibly liquidated to zero on the next available pre-hold-out embargo date after the last active sleeve. This terminal liquidation is exempt from the daily turnover budget, but its transaction cost is fully charged. This ensures no development exposure enters the locked hold-out.
+
+**Acceptance rule**  
+A turnover-budgeted candidate qualifies only if all of the following hold relative to instant pruned8 execution:
+
+1. annualised turnover is reduced by at least 25%;
+2. zero-cost annualised return retains at least 80% of the instant portfolio's zero-cost annualised return;
+3. 5 bps net annualised return exceeds the instant portfolio's 5 bps net annualised return;
+4. 5 bps Sharpe exceeds the instant portfolio's 5 bps Sharpe.
+
+If more than one candidate qualifies, select the qualifying budget with the highest 5 bps net annualised return. If two candidates are effectively tied to within 1 basis point of annualised return, select the one with lower annualised turnover.
+
+No other turnover budgets or objective functions are tested in EXP-004.
+
+**Diagnostics**  
+For each budget report:
+
+- zero-cost and 2/5/10/20 bps annualised return;
+- Sharpe and maximum drawdown;
+- average and annualised turnover;
+- turnover reduction versus instant execution;
+- zero-cost return retention;
+- average and 95th-percentile tracking error (|w_t-w_t^*|_2);
+- fraction of dates on which the turnover constraint is binding to within (10^{-6});
+- optimisation failure count.
+
+The model's rank IC is reported only as a frozen reference because portfolio projection does not alter predictions.
+
+**Development-only evaluation**  
+Use the exact frozen market-data artifact, 252-date locked hold-out, six-date pre-hold-out embargo, 49-fold purged walk-forward design, five-session target, five-sleeve portfolio translation and transaction-cost assumptions from EXP-001–003.
+
+**Result**  
+Pending.
+
+**Decision**  
+Pending.
+
+**Commit / output references**  
+Frozen data/hold-out: `9dc3f66770e10159949df9c86d4743824fe94b76`.  
+Current development benchmark: `pruned8` from EXP-003, recorded at `ac88f152510bd04f4eb774a4746f3c1aacf2338c`.  
+EXP-004 implementation and outputs will be added after execution.
+
