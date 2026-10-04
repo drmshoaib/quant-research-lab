@@ -1,0 +1,167 @@
+name: Economic Accounting Correction
+
+on:
+  push:
+    paths:
+      - ".github/workflows/economic-correction.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  exp001:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev,data]'
+      - uses: actions/download-artifact@v4
+        with:
+          name: v0.2-freeze
+          path: frozen
+          github-token: ${{ github.token }}
+          repository: drmshoaib/quant-research-lab
+          run-id: 37189218641
+      - name: Verify frozen data
+        run: |
+          cmp frozen/configs/holdout_dates.csv configs/holdout_dates.csv
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          expected=json.loads(Path("configs/data_snapshot.json").read_text())["sha256"]
+          actual=hashlib.sha256(Path("frozen/outputs/market_data.csv").read_bytes()).hexdigest()
+          assert actual==expected, (actual, expected)
+          print(actual)
+          PY
+      - name: Recompute EXP-001
+        run: python scripts/run_baseline.py --data frozen/outputs/market_data.csv --output-dir outputs/corrected/exp001
+      - name: Print summary
+        run: |
+          echo CORRECTED_EXP001_BEGIN
+          cat outputs/corrected/exp001/summary.json
+          echo CORRECTED_EXP001_END
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corrected-exp001-simple-return
+          path: outputs/corrected/exp001
+          retention-days: 90
+
+  exp002:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev,data]'
+      - uses: actions/download-artifact@v4
+        with:
+          name: v0.2-freeze
+          path: frozen
+          github-token: ${{ github.token }}
+          repository: drmshoaib/quant-research-lab
+          run-id: 37189218641
+      - name: Recompute EXP-002
+        run: python scripts/run_exp002.py --data frozen/outputs/market_data.csv --output-dir outputs/corrected/exp002
+      - name: Print summary
+        run: |
+          echo CORRECTED_EXP002_BEGIN
+          cat outputs/corrected/exp002/summary.json
+          echo CORRECTED_EXP002_END
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corrected-exp002-simple-return
+          path: outputs/corrected/exp002
+          retention-days: 90
+
+  exp003:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev,data]'
+      - uses: actions/download-artifact@v4
+        with:
+          name: v0.2-freeze
+          path: frozen
+          github-token: ${{ github.token }}
+          repository: drmshoaib/quant-research-lab
+          run-id: 37189218641
+      - name: Recompute EXP-003
+        run: python scripts/run_exp003.py --data frozen/outputs/market_data.csv --output-dir outputs/corrected/exp003
+      - name: Print summary
+        run: |
+          echo CORRECTED_EXP003_BEGIN
+          cat outputs/corrected/exp003/summary.json
+          echo CORRECTED_EXP003_END
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corrected-exp003-simple-return
+          path: outputs/corrected/exp003
+          retention-days: 90
+
+  exp004:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev,data]'
+      - uses: actions/download-artifact@v4
+        with:
+          name: v0.2-freeze
+          path: frozen
+          github-token: ${{ github.token }}
+          repository: drmshoaib/quant-research-lab
+          run-id: 37189218641
+      - name: Recompute EXP-004
+        run: python scripts/run_exp004.py --data frozen/outputs/market_data.csv --output-dir outputs/corrected/exp004
+      - name: Print summary
+        run: |
+          echo CORRECTED_EXP004_BEGIN
+          cat outputs/corrected/exp004/summary.json
+          echo CORRECTED_EXP004_END
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corrected-exp004-simple-return
+          path: outputs/corrected/exp004
+          retention-days: 90
+
+  exp005:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev,data]'
+      - uses: actions/download-artifact@v4
+        with:
+          name: v0.2-freeze
+          path: frozen
+          github-token: ${{ github.token }}
+          repository: drmshoaib/quant-research-lab
+          run-id: 37189218641
+      - name: Recompute EXP-005
+        run: python scripts/run_exp005.py --data frozen/outputs/market_data.csv --output-dir outputs/corrected/exp005
+      - name: Print summary
+        run: |
+          echo CORRECTED_EXP005_BEGIN
+          cat outputs/corrected/exp005/summary.json
+          echo CORRECTED_EXP005_END
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corrected-exp005-simple-return
+          path: outputs/corrected/exp005
+          retention-days: 90
