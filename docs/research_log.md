@@ -564,7 +564,7 @@ EXP-006 implementation and outputs will be added after execution.
 ## EXP-007 — Group-neutral target and within-group alpha
 
 **Date registered:** 4 October 2026  
-**Status:** proposed
+**Status:** complete — four of five gates passed; overall rule failed
 
 **Question**  
 Does the frozen \`pruned8\` HistGradientBoosting specification contain genuine within-asset-group relative-return information after broad asset-class moves are removed from the target, or is the development signal mainly a consequence of between-group structure and the breadth of the US risk-asset block?
