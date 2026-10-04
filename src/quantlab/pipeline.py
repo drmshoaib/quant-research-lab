@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Sequence
 
 import pandas as pd
 
@@ -84,7 +85,15 @@ def walk_forward_predictions(
     step_days: int,
     ridge_alpha: float = 10.0,
     random_state: int = 42,
+    feature_columns: Sequence[str] | None = None,
 ) -> pd.DataFrame:
+    features = list(FEATURE_COLUMNS if feature_columns is None else feature_columns)
+    if not features:
+        raise ValueError("feature_columns must contain at least one feature")
+    unknown = sorted(set(features).difference(research.frame.columns))
+    if unknown:
+        raise ValueError(f"unknown feature columns: {unknown}")
+
     dev_frame = select_dates(research.frame, research.development_dates)
     splitter = PurgedWalkForward(
         min_train_days=min_train_days,
@@ -99,8 +108,8 @@ def walk_forward_predictions(
         if train.empty or test.empty:
             continue
         model = make_model(model_name, ridge_alpha=ridge_alpha, random_state=random_state)
-        model.fit(train[FEATURE_COLUMNS], train["target"])
-        pred = model.predict(test[FEATURE_COLUMNS])
+        model.fit(train[features], train["target"])
+        pred = model.predict(test[features])
         p = pd.DataFrame({"y_true": test["target"], "y_pred": pred}, index=test.index)
         p["fold"] = fold
         pieces.append(p)

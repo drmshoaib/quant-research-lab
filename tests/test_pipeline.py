@@ -50,3 +50,19 @@ def test_holdout_manifest_is_feature_independent_and_embargoed(synthetic_panel):
         min_assets=8,
     )
     assert changed_research.holdout_dates.equals(holdout)
+
+
+def test_walk_forward_subset_features_runs(synthetic_panel):
+    research = prepare_research_frame(synthetic_panel, horizon=5, holdout_days=100)
+    pred = walk_forward_predictions(
+        research,
+        model_name="hist_gb",
+        horizon=5,
+        min_train_days=400,
+        test_days=50,
+        step_days=50,
+        feature_columns=["ret_1", "mom_5", "vol_20"],
+    )
+    assert not pred.empty
+    assert set(pred.columns) == {"y_true", "y_pred", "fold"}
+
