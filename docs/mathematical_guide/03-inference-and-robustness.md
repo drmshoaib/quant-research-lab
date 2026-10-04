@@ -1,0 +1,671 @@
+# Part 3 — Rank IC, Statistical Inference and Robustness
+
+Main implementation:
+
+- [src/quantlab/metrics.py](../../src/quantlab/metrics.py)
+- [src/quantlab/robustness.py](../../src/quantlab/robustness.py)
+- [src/quantlab/group_neutral.py](../../src/quantlab/group_neutral.py)
+- [scripts/run_exp006.py](../../scripts/run_exp006.py)
+- [scripts/run_exp007.py](../../scripts/run_exp007.py)
+
+## 1. Why correlation is evaluated cross-sectionally
+
+On each date \(t\), the model produces one score for each available ETF:
+
+\[
+\hat y_{1,t},\hat y_{2,t},\ldots,\hat y_{N_t,t}.
+\]
+
+Later we observe the corresponding future relative returns
+
+\[
+y_{1,t},y_{2,t},\ldots,y_{N_t,t}.
+\]
+
+The question is not whether today's score is correlated with yesterday's return across time. The question is:
+
+> on this date, did the model rank the future winners above the future losers?
+
+That makes the basic unit of evaluation a **daily cross-section**.
+
+## 2. Spearman rank correlation
+
+Python: [rank_ic_by_date](../../src/quantlab/metrics.py).
+
+Spearman correlation is ordinary Pearson correlation applied to ranks.
+
+Suppose the model scores four assets as
+
+\[
+(0.8,0.1,0.5,0.3).
+\]
+
+Their ascending ranks are
+
+\[
+(4,1,3,2).
+\]
+
+Suppose realised targets are
+
+\[
+(0.04,-0.01,0.02,0.01),
+\]
+
+whose ranks are also
+
+\[
+(4,1,3,2).
+\]
+
+Then Spearman correlation is \(1\): perfect ranking.
+
+If the realised ranks are exactly reversed, Spearman correlation is \(-1\).
+
+### 2.1 Pearson correlation formula on ranks
+
+Let \(R_i\) be the rank of the model score and \(S_i\) the rank of the realised target. Then
+
+\[
+\rho_S
+=
+\frac{
+\sum_i(R_i-\bar R)(S_i-\bar S)
+}{
+\sqrt{\sum_i(R_i-\bar R)^2}
+\sqrt{\sum_i(S_i-\bar S)^2}
+}.
+\]
+
+The daily information coefficient is
+
+\[
+IC_t
+=
+\rho_S(\hat y_{\cdot,t},y_{\cdot,t}).
+\]
+
+The code requires at least eight assets for the main IC.
+
+## 3. Why rank correlation rather than ordinary correlation?
+
+Ordinary Pearson correlation is sensitive to magnitude.
+
+If one ETF has an extreme realised return, it can strongly influence Pearson correlation.
+
+Spearman correlation only cares about ordering. It is invariant to strictly monotone transformations.
+
+If
+
+\[
+\hat y' = 100\hat y+7,
+\]
+
+the ranks are unchanged, so Spearman IC is unchanged.
+
+This fits the project because the portfolio is built from cross-sectional ranks.
+
+## 4. Mean IC
+
+Over \(T\) scored dates,
+
+\[
+\bar{IC}
+=
+\frac{1}{T}
+\sum_{t=1}^{T}IC_t.
+\]
+
+A positive mean indicates that, on average, higher model scores are associated with higher future relative returns.
+
+The final pruned8 development result is approximately
+
+\[
+\bar{IC}=0.02701.
+\]
+
+That number may look small. In noisy financial cross-sections, small correlations can still be statistically informative if they are persistent.
+
+## 5. IC standard deviation and IC information ratio
+
+Let
+
+\[
+s_{IC}
+=
+\sqrt{
+\frac{1}{T-1}
+\sum_t(IC_t-\bar{IC})^2
+}.
+\]
+
+The code reports a daily IC information ratio:
+
+\[
+IR_{IC}
+=
+\frac{\bar{IC}}{s_{IC}}.
+\]
+
+Python: [rank_ic_diagnostics](../../src/quantlab/metrics.py).
+
+This is a descriptive signal-to-noise ratio. It is **not** the same as a portfolio Sharpe ratio.
+
+## 6. Why an ordinary t-test is not enough
+
+A naive t-statistic for the mean assumes independent observations.
+
+But five-session targets overlap. For example:
+
+- the target attached to Monday uses returns from Tuesday through the following Tuesday;
+- the target attached to Tuesday uses Wednesday through the following Wednesday.
+
+Those two observations share much of the same market path.
+
+The IC sequence can therefore be autocorrelated.
+
+Ignoring that dependence can make the standard error too small and the t-statistic too large.
+
+## 7. HAC / Newey-West inference
+
+Python: [hac_mean_test](../../src/quantlab/metrics.py).
+
+The mean test can be written as a regression with only an intercept:
+
+\[
+IC_t=\mu+\varepsilon_t.
+\]
+
+The estimate of \(\mu\) is simply the sample mean \(\bar{IC}\).
+
+The challenge is estimating the variance of that mean when residuals \(\varepsilon_t\) may be serially correlated.
+
+### 7.1 Autocovariance
+
+For lag \(k\), estimate
+
+\[
+\hat\gamma_k
+=
+\frac{1}{T}
+\sum_{t=k+1}^{T}
+(\varepsilon_t)(\varepsilon_{t-k}).
+\]
+
+If observations are independent, non-zero-lag autocovariances should be near zero.
+
+### 7.2 Newey-West long-run variance
+
+A simplified Newey-West estimator with maximum lag \(L\) is
+
+\[
+\hat\Omega
+=
+\hat\gamma_0
++
+2\sum_{k=1}^{L}
+w_k\hat\gamma_k,
+\]
+
+where Bartlett weights are
+
+\[
+w_k
+=
+1-\frac{k}{L+1}.
+\]
+
+The variance of the sample mean is then approximately
+
+\[
+Var(\bar{IC})
+\approx
+\frac{\hat\Omega}{T}.
+\]
+
+The HAC standard error is
+
+\[
+SE_{HAC}
+=
+\sqrt{Var(\bar{IC})}.
+\]
+
+Then
+
+\[
+t_{HAC}
+=
+\frac{\bar{IC}}{SE_{HAC}}.
+\]
+
+The project uses statsmodels to compute this covariance robustly.
+
+For the primary five-session horizon, the registered lag is
+
+\[
+L=h-1=4.
+\]
+
+The idea is to allow correlation generated by overlapping five-session outcomes.
+
+## 8. p-values
+
+A two-sided p-value asks:
+
+> if the true mean IC were zero, how surprising would a t-statistic at least this extreme be?
+
+The project does not interpret a small p-value as “the probability the model is false.”
+
+Instead it is evidence against the null hypothesis
+
+\[
+H_0:\mu_{IC}=0.
+\]
+
+For pruned8,
+
+\[
+t_{HAC}\approx3.922,
+\qquad
+p\approx8.78\times10^{-5}.
+\]
+
+## 9. Temporal diagnostics
+
+A single average can hide instability.
+
+The project therefore reports:
+
+- fold mean IC;
+- median fold IC;
+- annual mean IC;
+- fraction of eligible years with positive IC.
+
+Python: [rank_ic_diagnostics](../../src/quantlab/metrics.py).
+
+If a signal has a strong overall mean but is negative in most years, its aggregate result may be dominated by a small number of exceptional periods.
+
+## 10. Chronological thirds
+
+Python: [chronological_ic_blocks](../../src/quantlab/robustness.py).
+
+The ordered IC series is split into three nearly equal consecutive blocks.
+
+For each block \(b\),
+
+\[
+\bar{IC}_b
+=
+\frac{1}{T_b}
+\sum_{t\in b}IC_t.
+\]
+
+Each block receives its own HAC test.
+
+This is a simple stability check:
+
+> did the signal exist in early, middle and later development history?
+
+It is not a substitute for a final untouched hold-out because the researcher still sees all three development blocks.
+
+## 11. Multiple testing problem
+
+Suppose we test 20 meaningless features at the 5% level.
+
+Even if every null hypothesis is true, we expect roughly
+
+\[
+20\times0.05=1
+\]
+
+false positive on average.
+
+The more hypotheses we test, the more dangerous raw p-values become.
+
+The project therefore uses Benjamini-Hochberg false discovery rate control for experiment families such as feature ablations and alternate horizons.
+
+## 12. Benjamini-Hochberg procedure
+
+Suppose there are \(m\) p-values:
+
+\[
+p_1,\ldots,p_m.
+\]
+
+Sort them:
+
+\[
+p_{(1)}\le p_{(2)}\le\cdots\le p_{(m)}.
+\]
+
+Choose an FDR level \(q\), here often
+
+\[
+q=0.10.
+\]
+
+Find the largest rank \(k\) satisfying
+
+\[
+p_{(k)}
+\le
+\frac{k}{m}q.
+\]
+
+Then reject hypotheses \(1,\ldots,k\).
+
+Python usage appears in [scripts/run_exp002.py](../../scripts/run_exp002.py) and [scripts/run_exp006.py](../../scripts/run_exp006.py) through statsmodels multipletests.
+
+### Why FDR rather than Bonferroni?
+
+Bonferroni controls the probability of **any** false positive and can be very conservative.
+
+FDR instead controls the expected proportion of false discoveries among rejected hypotheses. That is useful in exploratory signal research where several related hypotheses are examined.
+
+## 13. Feature ablation
+
+Ablation asks:
+
+> what happens if one feature is removed?
+
+Let
+
+\[
+IC_t^{full}
+\]
+
+be the full-model daily IC and
+
+\[
+IC_t^{(-j)}
+\]
+
+the IC after feature \(j\) is removed.
+
+Define paired IC loss
+
+\[
+D_{j,t}
+=
+IC_t^{full}-IC_t^{(-j)}.
+\]
+
+Then test the mean loss with HAC:
+
+\[
+H_0:E[D_{j,t}]=0.
+\]
+
+This paired design is stronger than comparing two unrelated aggregate numbers because both models are evaluated on the same dates.
+
+EXP-002 also applied BH correction across feature-removal tests.
+
+## 14. Horizon robustness
+
+EXP-006 evaluates horizons
+
+\[
+h\in\{1,5,10,20\}.
+\]
+
+For each horizon, the target becomes
+
+\[
+r^{(h)}_{i,t}
+=
+\log\left(
+\frac{O_{i,t+h+1}}{O_{i,t+1}}
+\right),
+\]
+
+and the embargo is adjusted to
+
+\[
+h+1.
+\]
+
+Python:
+
+- [prepare_horizon_research_frame](../../src/quantlab/robustness.py)
+- [scripts/run_exp006.py](../../scripts/run_exp006.py)
+
+The alternate horizon p-values are BH-corrected.
+
+This asks whether the signal is specific to one arbitrarily chosen forecast horizon.
+
+## 15. Asset-group diagnostics
+
+The 30 ETFs are mapped into four broad groups:
+
+1. US risk assets;
+2. international equity;
+3. fixed income;
+4. commodities.
+
+Python: [broad_asset_group_map](../../src/quantlab/robustness.py).
+
+### 15.1 Within-group IC
+
+For group \(g\),
+
+\[
+IC_{g,t}
+=
+\rho_S(
+\hat y_{i,t},
+y_{i,t}
+:
+i\in g
+).
+\]
+
+This tests whether the model ranks assets correctly **inside** each group.
+
+### 15.2 Leave-one-group-out IC
+
+Remove group \(g\) and recompute the cross-sectional IC on the remaining assets.
+
+If full mean IC is \(\bar{IC}_{full}\) and leave-one-group-out mean is \(\bar{IC}_{-g}\), define retention
+
+\[
+Retention_g
+=
+\frac{\bar{IC}_{-g}}{\bar{IC}_{full}}.
+\]
+
+If removing one group destroys most of the signal, the aggregate result depends materially on that group.
+
+EXP-006 failed its overall asset-group rule because removing the US risk block left only about 43.8% of the full mean IC and lost conventional significance.
+
+## 16. Symbol-identity permutation test
+
+Python: [global_symbol_permutation_test](../../src/quantlab/robustness.py).
+
+This is a falsification test.
+
+The observed prediction paths remain intact through time, but their symbol labels are globally permuted relative to the target paths.
+
+Why preserve entire paths?
+
+Because independently shuffling every date would destroy serial structure. A single global symbol permutation preserves each model score path and each date's score distribution.
+
+### 16.1 Observed statistic
+
+\[
+T_{obs}
+=
+\frac{1}{T}
+\sum_t IC_t.
+\]
+
+### 16.2 Null replicates
+
+For permutation \(b\),
+
+\[
+T_b^{perm}
+=
+\frac{1}{T}
+\sum_t
+\rho_S(
+y_{\cdot,t},
+\hat y_{\pi_b(\cdot),t}
+).
+\]
+
+The project uses exactly
+
+\[
+B=999
+\]
+
+permutations with a fixed random seed.
+
+### 16.3 Empirical p-value
+
+\[
+p_{perm}
+=
+\frac{
+1+\#\{T_b^{perm}\ge T_{obs}\}
+}{
+B+1
+}.
+\]
+
+With \(B=999\), the denominator is 1000.
+
+The observed result produced
+
+\[
+p_{perm}=0.001.
+\]
+
+That is the smallest possible p-value with this exact formula and 999 permutations.
+
+## 17. Why add 1 to numerator and denominator?
+
+Without the correction, if no permutation beats the observed statistic we would report \(p=0\).
+
+A finite Monte Carlo experiment cannot prove the true tail probability is literally zero.
+
+The plus-one correction gives a valid finite-simulation estimate and avoids impossible zero p-values.
+
+## 18. Group-neutral retraining
+
+EXP-007 changes the training target to
+
+\[
+y^{GN}_{i,t}
+=
+r_{i,t}
+-
+\bar r_{g(i),t}.
+\]
+
+The same features, folds, dates and HistGradientBoosting hyperparameters are used.
+
+Then within-group IC is calculated.
+
+Python:
+
+- [prepare_group_neutral_research_frame](../../src/quantlab/group_neutral.py)
+- [within_group_ic_matrix](../../src/quantlab/group_neutral.py)
+- [composite_ic_diagnostics](../../src/quantlab/group_neutral.py)
+
+## 19. Equal-weight group composites
+
+If four group ICs are available on date \(t\),
+
+\[
+IC^{4G}_t
+=
+\frac14
+\sum_{g=1}^{4}IC_{g,t}.
+\]
+
+This gives the large US-risk block the same group-level weight as the smaller fixed-income or commodity block.
+
+The non-US composite is
+
+\[
+IC^{nonUS}_t
+=
+\frac13
+(
+IC_{International,t}
++
+IC_{FixedIncome,t}
++
+IC_{Commodities,t}
+).
+\]
+
+These composite series receive HAC inference just like the main IC.
+
+## 20. Retention after group-neutral retraining
+
+Let
+
+\[
+\bar{IC}^{control}_{4G}
+\]
+
+be the equal-weight four-group IC for the ordinary target and
+
+\[
+\bar{IC}^{GN}_{4G}
+\]
+
+the group-neutral version.
+
+Retention is
+
+\[
+Retention
+=
+\frac{
+\bar{IC}^{GN}_{4G}
+}{
+\bar{IC}^{control}_{4G}
+}.
+\]
+
+EXP-007 found about
+
+\[
+86.3\%.
+\]
+
+This indicates that much of the within-group ranking information survives removal of broad group target means.
+
+## 21. Why the p = 0.0501247 result matters
+
+The pre-registered non-US gate required
+
+\[
+p<0.05.
+\]
+
+The result was
+
+\[
+p=0.0501247.
+\]
+
+That is extremely close but still a failure.
+
+Rounding it to 0.05 and declaring success would change the rule after seeing the result.
+
+This is an important lesson in quantitative research:
+
+> credibility depends not only on statistical technique, but also on refusing to redefine success after observing the data.
+
+## 22. Development evidence is not final evidence
+
+Every test described in this part used development data.
+
+Even pre-registration cannot make repeated development analysis equivalent to a new untouched sample.
+
+That is why the final hold-out still matters.

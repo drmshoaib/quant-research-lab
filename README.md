@@ -19,8 +19,11 @@ The evidence is statistically interesting but **not a production trading result*
 
 **The final 252-date hold-out remains locked and unevaluated.**
 
+Learn or review the full mathematics in the **[undergraduate mathematical guide](docs/mathematical_guide/README.md)**. It derives the returns, features, Ridge and gradient boosting models, purged walk-forward validation, HAC/Newey-West inference, Spearman IC, multiple-testing control, portfolio construction, transaction costs, constrained optimisation and robustness tests, with direct links to the Python implementation and a worked example.
+
 Read the evidence in:
 
+- [Mathematical guide](docs/mathematical_guide/README.md)
 - [Research note](docs/research_note.md)
 - [Final frozen specification](configs/final_specification_v0.2.json)
 - [Research log](docs/research_log.md)
