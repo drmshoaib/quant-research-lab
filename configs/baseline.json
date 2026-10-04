@@ -1,0 +1,15 @@
+{
+  "start": "2010-01-01",
+  "end": null,
+  "horizon": 5,
+  "min_train_days": 756,
+  "test_days": 63,
+  "step_days": 63,
+  "holdout_days": 252,
+  "models": ["ridge", "hist_gb"],
+  "ridge_alpha": 10.0,
+  "cost_bps": 5.0,
+  "gross_limit": 1.0,
+  "max_abs_weight": 0.08,
+  "random_state": 42
+}
