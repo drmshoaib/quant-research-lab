@@ -370,3 +370,97 @@ Frozen data/hold-out: \`9dc3f66770e10159949df9c86d4743824fe94b76\`.
 Current development benchmark: \`pruned8\` from EXP-003, recorded at \`ac88f152510bd04f4eb774a4746f3c1aacf2338c\`.  
 EXP-004 implementation and outputs will be added after execution.
 
+## EXP-005 — No-trade band execution
+
+**Date registered:** 4 October 2026  
+**Status:** proposed
+
+**Question**  
+Can the fast \`pruned8\` HistGradientBoosting signal be traded more efficiently by ignoring small desired per-name weight changes while executing larger changes immediately, rather than imposing a portfolio-wide turnover budget or temporal smoothing?
+
+**Forecast specification**  
+Use the frozen \`pruned8\` HistGradientBoosting model selected in EXP-003 without changing features, hyperparameters, target, walk-forward folds, rank construction or five-sleeve horizon translation.
+
+The instantaneous five-sleeve rank portfolio \(w_t^*\) is the desired target.
+
+**No-trade rule**  
+Let \(w_{t-1}\) be the previous actual portfolio and define the desired per-name change
+
+\[
+d_{i,t}=w_{i,t}^*-w_{i,t-1}.
+\]
+
+For a fixed no-trade band \(b\), names satisfying
+
+\[
+|d_{i,t}| \le b
+\]
+
+are held exactly at their previous actual weight.
+
+Names with \(|d_{i,t}|>b\) are eligible to trade immediately. Among eligible names, solve the minimum-distance portfolio
+
+\[
+\min_w \sum_i (w_i-w_{i,t}^*)^2
+\]
+
+subject to dollar neutrality, gross exposure at most 1.0, per-name absolute weight at most 0.08, and the additional monotonicity constraint that every traded name must remain between its previous actual weight and its current target weight. This prevents overshooting the signal target merely to satisfy another constraint.
+
+The previous actual portfolio is always feasible, so the policy can choose not to trade when the active set cannot improve the target while preserving constraints.
+
+Test exactly three pre-declared absolute weight bands:
+
+- \(b=0.005\) (0.5 percentage points of portfolio weight);
+- \(b=0.010\) (1.0 percentage point);
+- \(b=0.020\) (2.0 percentage points).
+
+These thresholds are defined in per-name portfolio-weight units and are unrelated to the EXP-004 turnover-budget values.
+
+The final development portfolio is forcibly liquidated to zero on the next available pre-hold-out embargo date after the last active sleeve. Terminal liquidation is exempt from the no-trade band but its full transaction cost is charged.
+
+**Solver rule**  
+The constrained projection is initialised at the previous feasible portfolio. If SLSQP fails or any constraint is violated beyond \(10^{-7}\), the deterministic fallback is the previous actual portfolio for that date, implying no discretionary trade. Every fallback is counted. EXP-005 is operationally invalid if fallbacks exceed 0.5% of regular projected development dates for any tested band.
+
+**Acceptance rule**  
+A no-trade candidate qualifies only if all of the following hold relative to instant pruned8 execution:
+
+1. annualised turnover is reduced by at least 25%;
+2. zero-cost annualised return retains at least 80% of the instant portfolio's zero-cost annualised return;
+3. 5 bps net annualised return exceeds the instant portfolio's 5 bps net annualised return;
+4. 5 bps Sharpe exceeds the instant portfolio's 5 bps Sharpe.
+
+If more than one candidate qualifies, select the qualifying band with the highest 5 bps net annualised return. If two candidates are within 1 basis point of annualised return, select the one with lower annualised turnover.
+
+No other no-trade bands or execution rules are tested in EXP-005.
+
+**Diagnostics**  
+For each band report:
+
+- zero-cost and 2/5/10/20 bps annualised return;
+- Sharpe and maximum drawdown;
+- average and annualised turnover;
+- turnover reduction versus instant execution;
+- zero-cost return retention;
+- average and 95th-percentile tracking error \(\|w_t-w_t^*\|_2\);
+- mean active-name fraction and mean held-name fraction;
+- mean fraction of desired L1 target change ignored by the band;
+- fraction of dates with no discretionary trade;
+- solver fallback count and rate.
+
+The model's rank IC is reported only as a frozen reference because the no-trade rule does not change predictions.
+
+**Development-only evaluation**  
+Use the exact frozen market-data artifact, 252-date locked hold-out, six-date pre-hold-out embargo, 49-fold purged walk-forward design, five-session target, five-sleeve portfolio translation and transaction-cost assumptions from EXP-001–004.
+
+**Result**  
+Pending.
+
+**Decision**  
+Pending.
+
+**Commit / output references**  
+Frozen data/hold-out: \`9dc3f66770e10159949df9c86d4743824fe94b76\`.  
+Current formal development benchmark: instant \`pruned8\`, recorded in EXP-003 at \`ac88f152510bd04f4eb774a4746f3c1aacf2338c\`.  
+EXP-004 turnover-budget result: \`c343b89adfb5a02faadddb34339f3a0b52a7e793\`.  
+EXP-005 implementation and outputs will be added after execution.
+
