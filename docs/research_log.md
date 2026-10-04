@@ -467,7 +467,7 @@ EXP-005 implementation and outputs will be added after execution.
 ## EXP-006 — Robustness and falsification of pruned8
 
 **Date registered:** 4 October 2026  
-**Status:** proposed
+**Status:** complete — overall robustness rule failed on asset-group dependence
 
 **Question**  
 Does the predictive rank IC of the frozen \`pruned8\` HistGradientBoosting specification survive independent challenges to horizon, time period, asset-group composition and symbol identity, or is the EXP-001–005 result plausibly an artefact of one sample/specification?
