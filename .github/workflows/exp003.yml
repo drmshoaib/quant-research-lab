@@ -1,4 +1,5 @@
 name: EXP-003 Reduced Features and Execution
+# rerun after cost-key compatibility fix
 
 on:
   push:
