@@ -88,3 +88,18 @@ def test_partial_adjustment_reduces_turnover_for_alternating_targets():
     instant_bt = run_backtest(target, realized, cost_bps=0)
     actual_bt = run_backtest(actual, realized, cost_bps=0)
     assert actual_bt["turnover"].sum() < instant_bt["turnover"].sum()
+
+
+def test_backtest_summary_compounds_simple_returns():
+    from quantlab.metrics import backtest_summary
+
+    daily = pd.DataFrame({
+        "gross_return": [0.10, -0.10],
+        "turnover": [0.0, 0.0],
+        "cost": [0.0, 0.0],
+        "net_return": [0.10, -0.10],
+    })
+    summary = backtest_summary(daily)
+    expected_equity = 1.10 * 0.90
+    expected_drawdown = expected_equity / 1.10 - 1.0
+    assert np.isclose(summary["max_drawdown"], expected_drawdown)
