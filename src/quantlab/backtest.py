@@ -58,7 +58,7 @@ def staggered_weights(
 
     cohorts = w.reindex(eval_dates, fill_value=0.0)
     live = cohorts.rolling(window=horizon, min_periods=1).sum() / float(horizon)
-    out = live.stack(dropna=False)
+    out = live.stack()
     out.index = out.index.set_names(["date", "symbol"])
     return out.sort_index().rename("weight")
 
