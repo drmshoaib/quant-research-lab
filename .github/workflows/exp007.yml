@@ -1,0 +1,89 @@
+name: EXP-007 Group-Neutral Target
+
+on:
+  push:
+    paths:
+      - ".github/workflows/exp007.yml"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  exp007:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev,data]'
+
+      - name: Run unit tests
+        run: pytest
+
+      - name: Download original frozen data artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: v0.2-freeze
+          path: frozen
+          github-token: ${{ github.token }}
+          repository: drmshoaib/quant-research-lab
+          run-id: 37189218641
+
+      - name: Verify frozen data snapshot and holdout
+        run: |
+          cmp frozen/configs/holdout_dates.csv configs/holdout_dates.csv
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          meta = json.loads(Path("configs/data_snapshot.json").read_text())
+          path = Path("frozen/outputs/market_data.csv")
+          actual = hashlib.sha256(path.read_bytes()).hexdigest()
+          expected = meta["sha256"]
+          print(f"EXPECTED_SHA256={expected}")
+          print(f"ACTUAL_SHA256={actual}")
+          if actual != expected:
+              raise SystemExit("Frozen market-data checksum mismatch; refusing to run EXP-007.")
+          print("Original frozen data snapshot and holdout manifest verified.")
+          PY
+
+      - name: Run EXP-007
+        run: |
+          python scripts/run_exp007.py \
+            --data frozen/outputs/market_data.csv \
+            --output-dir outputs/exp007
+
+      - name: Print EXP-007 compact summary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          s = json.loads(Path("outputs/exp007/summary.json").read_text())
+          compact = {
+              "control": s["control"],
+              "group_neutral": s["group_neutral"],
+              "control_four_group_mean_common_dates": s["control_four_group_mean_common_dates"],
+              "group_neutral_four_group_mean_common_dates": s["group_neutral_four_group_mean_common_dates"],
+              "four_group_ic_retention_vs_control": s["four_group_ic_retention_vs_control"],
+              "group_positive_count": s["group_positive_count"],
+              "group_neutral_chronological_thirds": s["group_neutral_chronological_thirds"],
+              "acceptance_gates": s["acceptance_gates"],
+              "overall_pass": s["overall_pass"],
+          }
+          print("EXP007_COMPACT_BEGIN")
+          print(json.dumps(compact, indent=2))
+          print("EXP007_COMPACT_END")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exp007-development-results
+          path: outputs/exp007
+          retention-days: 90
