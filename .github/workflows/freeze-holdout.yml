@@ -1,0 +1,54 @@
+name: Freeze v0.2 Holdout
+
+on:
+  push:
+    paths:
+      - ".github/workflows/freeze-holdout.yml"
+
+jobs:
+  freeze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[data]'
+
+      - name: Generate frozen holdout manifest
+        run: python scripts/freeze_holdout.py
+
+      - name: Record frozen data snapshot
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import pandas as pd
+
+          data_path = Path("outputs/market_data.csv")
+          df = pd.read_csv(data_path, parse_dates=["date"])
+          payload = {
+              "file": str(data_path),
+              "sha256": hashlib.sha256(data_path.read_bytes()).hexdigest(),
+              "rows": int(len(df)),
+              "symbols": int(df["symbol"].nunique()),
+              "first_date": str(df["date"].min().date()),
+              "last_date": str(df["date"].max().date()),
+          }
+          print("DATA_SNAPSHOT_JSON=" + json.dumps(payload, sort_keys=True))
+          PY
+          echo "HOLDOUT_MANIFEST_BEGIN"
+          cat configs/holdout_dates.csv
+          echo "HOLDOUT_MANIFEST_END"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v0.2-freeze
+          path: |
+            configs/holdout_dates.csv
+            outputs/market_data.csv
+          retention-days: 7
