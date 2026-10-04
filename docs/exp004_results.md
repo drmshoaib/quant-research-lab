@@ -5,6 +5,9 @@
 **Hold-out:** Locked and untouched  
 **Successful workflow run:** `37191844160`
 
+**Accounting note (4 October 2026):** The economic portfolio figures in this file are preserved as originally recorded. A subsequent pre-hold-out technical audit corrected portfolio P&L to arithmetic open-to-open returns and standardised terminal liquidation costs. Statistical signal results and all registered decisions were unchanged. Use [`docs/accounting_correction.md`](accounting_correction.md) for the corrected economic figures.
+
+
 ## Research question
 
 EXP-004 kept the pruned8 HistGradientBoosting forecast fixed and changed only execution.
