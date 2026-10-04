@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 from statsmodels.stats.multitest import multipletests
 
-from quantlab.backtest import run_backtest, staggered_weights, weights_from_predictions
+from quantlab.backtest import append_liquidation_row, run_backtest, staggered_weights, weights_from_predictions
 from quantlab.data import load_panel_csv
 from quantlab.features import FEATURE_COLUMNS
 from quantlab.metrics import backtest_summary, hac_mean_test, rank_ic_by_date, rank_ic_diagnostics
@@ -31,6 +31,7 @@ def portfolio_diagnostics(
     *,
     realized: pd.Series,
     realized_dates: pd.DatetimeIndex,
+    holdout_start: pd.Timestamp,
     cfg: dict[str, object],
 ) -> dict[str, object]:
     ic = rank_ic_by_date(predictions, min_assets=int(cfg.get("min_assets", 8)))
@@ -50,6 +51,14 @@ def portfolio_diagnostics(
         horizon=int(cfg["horizon"]),
         decision_dates=realized_dates,
     )
+    last_live = pd.Timestamp(live.index.get_level_values("date").max())
+    liquidation_candidates = realized_dates[realized_dates > last_live]
+    if not len(liquidation_candidates):
+        raise ValueError("no realised-return date available for terminal liquidation")
+    liquidation_date = pd.Timestamp(liquidation_candidates[0])
+    if liquidation_date >= pd.Timestamp(holdout_start):
+        raise ValueError("terminal liquidation would enter the locked holdout")
+    live = append_liquidation_row(live, liquidation_date=liquidation_date)
     cost_sensitivity: dict[str, dict[str, float]] = {}
     base_bt = None
     for cost in cfg.get("cost_sensitivity_bps", [0, 2, 5, 10, 20]):
@@ -104,6 +113,7 @@ def main() -> None:
         full_pred,
         realized=realized,
         realized_dates=realized_dates,
+        holdout_start=research.holdout_dates[0],
         cfg=cfg,
     )
     full_ic = full_eval.pop("_rank_ic_series")
@@ -188,6 +198,7 @@ def main() -> None:
             smoothed,
             realized=realized,
             realized_dates=realized_dates,
+            holdout_start=research.holdout_dates[0],
             cfg=cfg,
         )
         ic_series = eval_.pop("_rank_ic_series")
