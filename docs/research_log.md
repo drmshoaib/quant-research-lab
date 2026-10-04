@@ -282,47 +282,49 @@ Development-results artifact: `11299500822` (digest `sha256:561697fcce6519bae1f1
 **Status:** proposed
 
 **Question**  
-Can the fast `pruned8` HistGradientBoosting signal selected in EXP-003 be expressed more efficiently by allocating a fixed daily turnover budget to the most important portfolio changes, rather than slowing every position uniformly?
+Can the fast \`pruned8\` HistGradientBoosting signal selected in EXP-003 be expressed more efficiently by allocating a fixed daily turnover budget to the most important portfolio changes, rather than slowing every position uniformly?
 
 **Forecast specification**  
-Use the frozen `pruned8` HistGradientBoosting model from EXP-003 without changing features, hyperparameters, target, walk-forward folds, rank construction or five-sleeve horizon translation.
+Use the frozen \`pruned8\` HistGradientBoosting model from EXP-003 without changing features, hyperparameters, target, walk-forward folds, rank construction or five-sleeve horizon translation.
 
-The instantaneous five-sleeve rank portfolio (w_t^*) is the desired target.
+The instantaneous five-sleeve rank portfolio \(w_t^*\) is the desired target.
 
 **Turnover-budgeted projection**  
-At each development date, choose the actual portfolio (w_t) by solving
+At each development date, choose the actual portfolio \(w_t\) by solving
 
-[
+\[
 \min_w \sum_i (w_i-w_{i,t}^*)^2
-]
+\]
 
 subject to
 
-[
+\[
 \sum_i w_i = 0,
-]
+\]
 
-[
+\[
 \sum_i |w_i| \le 1,
-]
+\]
 
-[
+\[
 |w_i| \le 0.08,
-]
+\]
 
 and
 
-[
+\[
 \sum_i |w_i-w_{i,t-1}| \le \tau.
-]
+\]
 
-The previous actual portfolio (w_{t-1}), not the previous target, defines turnover. The optimisation is causal and uses no realised returns.
+The previous actual portfolio \(w_{t-1}\), not the previous target, defines turnover. The optimisation is causal and uses no realised returns.
+
+SLSQP is initialised at the previous feasible portfolio. If the numerical solver fails or violates a constraint beyond \(10^{-7}\), the deterministic fallback is the largest feasible proportional move from the previous portfolio toward the current target; every fallback is counted. EXP-004 is considered operationally invalid if fallbacks exceed 0.5% of projected development dates for any tested budget.
 
 Test exactly three pre-declared daily L1 turnover budgets:
 
-- (	au=0.12);
-- (	au=0.10);
-- (	au=0.08).
+- \(\tau=0.12\);
+- \(\tau=0.10\);
+- \(\tau=0.08\).
 
 The instant pruned8 portfolio is the benchmark.
 
@@ -348,8 +350,8 @@ For each budget report:
 - average and annualised turnover;
 - turnover reduction versus instant execution;
 - zero-cost return retention;
-- average and 95th-percentile tracking error (|w_t-w_t^*|_2);
-- fraction of dates on which the turnover constraint is binding to within (10^{-6});
+- average and 95th-percentile tracking error \(\|w_t-w_t^*\|_2\);
+- fraction of dates on which the turnover constraint is binding to within \(10^{-6}\);
 - optimisation failure count.
 
 The model's rank IC is reported only as a frozen reference because portfolio projection does not alter predictions.
@@ -364,7 +366,7 @@ Pending.
 Pending.
 
 **Commit / output references**  
-Frozen data/hold-out: `9dc3f66770e10159949df9c86d4743824fe94b76`.  
-Current development benchmark: `pruned8` from EXP-003, recorded at `ac88f152510bd04f4eb774a4746f3c1aacf2338c`.  
+Frozen data/hold-out: \`9dc3f66770e10159949df9c86d4743824fe94b76\`.  
+Current development benchmark: \`pruned8\` from EXP-003, recorded at \`ac88f152510bd04f4eb774a4746f3c1aacf2338c\`.  
 EXP-004 implementation and outputs will be added after execution.
 
