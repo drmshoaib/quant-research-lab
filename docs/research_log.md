@@ -107,7 +107,7 @@ Frozen data/hold-out commit: `9dc3f66770e10159949df9c86d4743824fe94b76`.\nEXP-00
 ## EXP-002 — Nonlinear attribution and turnover reduction
 
 **Date registered:** 4 October 2026  
-**Status:** proposed
+**Status:** complete — attribution informative; smoothing rejected
 
 **Question**  
 Which of the nine frozen v0.1 features materially contribute to the development-sample HistGradientBoosting rank IC observed in EXP-001, and can that signal be expressed with substantially lower turnover without materially degrading predictive information?
@@ -160,13 +160,32 @@ Use the same frozen data snapshot, 252-date locked hold-out, six-date pre-hold-o
 For the full model, every ablation and every smoothing candidate report mean/median rank IC, HAC inference, fold/year stability and portfolio performance. For smoothing candidates also report turnover reduction and cost sensitivity at 0, 2, 5, 10 and 20 bps.
 
 **Result**  
-Pending.
+The full HistGradientBoosting benchmark reproduced EXP-001 exactly: mean rank IC 0.02624, HAC t = 3.849, p = 1.19e-4, annualised turnover 42.79, and 5 bps net annualised return 0.07%.
+
+Two features met the pre-registered material-contributor rule after nine-way BH-FDR control:
+
+- `vol_20`: mean IC loss 0.00887; paired HAC p = 0.0205; BH q = 0.0924;
+- `drawdown_60`: mean IC loss 0.00750; paired HAC p = 0.00583; BH q = 0.0524.
+
+`vol_60` had the largest raw point-estimate IC loss (0.00945) but did not survive BH-FDR (q = 0.151), so it is not labelled a material contributor under the registered rule. Removing `mom_5` slightly increased mean IC by 0.00077, but this difference was not statistically meaningful.
+
+All three causal smoothing candidates retained at least 80% of baseline IC and remained statistically positive. Span 10 reduced annualised turnover by 40.7%, exceeding the 30% turnover gate, but its 5 bps net annualised return fell to -0.64% versus +0.07% for the unsmoothed baseline. Spans 3 and 5 reduced turnover by only 13.5% and 24.4%, respectively, and also reduced 5 bps net return. No smoothing candidate passed all four pre-registered gates.
+
+The zero-cost annualised return declined monotonically from 2.21% unsmoothed to 1.41%, 1.00% and 0.63% for spans 3, 5 and 10. Approximate break-even one-way cost therefore fell from 5.16 bps unsmoothed to 3.80, 3.10 and 2.49 bps. In this experiment, causal smoothing destroyed gross alpha faster than it saved turnover.
 
 **Decision**  
-Pending.
+Retain `vol_20` and `drawdown_60` as supported nonlinear contributors. Treat `vol_60` as suggestive but not confirmed because it failed the registered FDR rule.
+
+Reject EWMA score smoothing with spans 3, 5 and 10 as the turnover solution. No smoothing candidate is promoted.
+
+Do not unlock the hold-out. A justified next experiment is a pre-registered reduced-feature / turnover-control study that tests whether the supported volatility-drawdown structure can be expressed more efficiently, without adding new features or inspecting hold-out outcomes.
 
 **Commit / output references**  
 Frozen data/hold-out: `9dc3f66770e10159949df9c86d4743824fe94b76`.  
 EXP-001 recorded result: `35f5268e52c4a2a66d29047fb53073dc2184e521`.  
-EXP-002 implementation and outputs will be added after execution.
+EXP-002 registration: `ca72cfda628e106dfbc62af05cf63558b606837a`.  
+EXP-002 implementation: `78d3a53ebde435132eb031422a3d01231188eabc`.  
+EXP-002 workflow commit: `25bf422d55b3f2f1451222b58a9563dff8611121`.  
+Workflow run: `37190136845`.  
+Development-results artifact: `11299225073` (digest `sha256:0156f1f6b0ed1d9b0f1f38011717f9c50fe40afcf979a79826853ce7a03b9640`).
 
