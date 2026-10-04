@@ -87,7 +87,7 @@ The frozen feature set is considered to have passed the primary development test
 1. mean daily rank IC > 0;
 2. HAC two-sided p-value < 0.05;
 3. median fold-level rank IC > 0;
-4. positive mean annual rank IC in at least 60% of development calendar years with sufficient observations.
+4. positive mean annual rank IC in at least 60% of development calendar years with at least 20 daily IC observations.
 
 Portfolio Sharpe is not an acceptance criterion for EXP-001. It is a secondary economic diagnostic.
 
@@ -102,5 +102,5 @@ Pending.
 **Commit / output references**  
 Protocol freeze: `04e57206fc4c7751dccc8e48cf799d707736af29`.  
 Safeguarded implementation lineage begins at `e3d42f24546edd05c8fd3f8ed9bec8ec15fed9b7`.  
-Frozen hold-out manifest and EXP-001 output references will be added after generation.
+Frozen data/hold-out commit: `9dc3f66770e10159949df9c86d4743824fe94b76`.\nEXP-001 output references will be added after the run.
 

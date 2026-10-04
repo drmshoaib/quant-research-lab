@@ -8,7 +8,7 @@ import pandas as pd
 
 from quantlab.backtest import run_backtest, staggered_weights, weights_from_predictions
 from quantlab.data import download_yahoo, load_panel_csv, load_universe, save_panel_csv
-from quantlab.metrics import backtest_summary, hac_mean_test, rank_ic_by_date
+from quantlab.metrics import backtest_summary, rank_ic_by_date, rank_ic_diagnostics
 from quantlab.pipeline import prepare_research_frame, walk_forward_predictions
 from quantlab.splits import load_date_manifest
 from quantlab.targets import next_open_to_open_return
@@ -73,6 +73,7 @@ def main() -> None:
             "horizon_sessions": cfg["horizon"],
             "portfolio_sleeves": cfg["horizon"],
             "cost_bps": cfg["cost_bps"],
+            "cost_sensitivity_bps": cfg.get("cost_sensitivity_bps", [0, 2, 5, 10, 20]),
         },
         "models": {},
     }
@@ -92,7 +93,12 @@ def main() -> None:
             continue
 
         ic = rank_ic_by_date(pred, min_assets=cfg.get("min_assets", 8))
-        ic_test = hac_mean_test(ic, maxlags=max(1, cfg["horizon"] - 1))
+        ic_diag = rank_ic_diagnostics(
+            ic,
+            pred,
+            hac_lag=max(1, cfg["horizon"] - 1),
+            min_year_days=cfg.get("min_year_ic_days", 20),
+        )
 
         cohort = weights_from_predictions(
             pred,
@@ -104,7 +110,12 @@ def main() -> None:
             horizon=cfg["horizon"],
             decision_dates=realized_dates,
         )
-        bt = run_backtest(live_weights, realized, cost_bps=cfg["cost_bps"])
+
+        base_bt = run_backtest(live_weights, realized, cost_bps=cfg["cost_bps"])
+        cost_sensitivity: dict[str, dict[str, float]] = {}
+        for cost in cfg.get("cost_sensitivity_bps", [0, 2, 5, 10, 20]):
+            bt_cost = run_backtest(live_weights, realized, cost_bps=float(cost))
+            cost_sensitivity[str(cost)] = backtest_summary(bt_cost)
 
         model_dir = outdir / model_name
         model_dir.mkdir(parents=True, exist_ok=True)
@@ -112,15 +123,32 @@ def main() -> None:
         ic.to_csv(model_dir / "rank_ic.csv", header=True)
         cohort.rename("cohort_weight").reset_index().to_csv(model_dir / "cohort_weights.csv", index=False)
         live_weights.reset_index().to_csv(model_dir / "live_weights.csv", index=False)
-        bt.to_csv(model_dir / "backtest.csv", index=True)
-        summary["models"][model_name] = {
-            "rank_ic_hac": ic_test,
-            "backtest": backtest_summary(bt),
+        base_bt.to_csv(model_dir / "backtest.csv", index=True)
+
+        model_summary: dict[str, object] = {
+            "rank_ic": ic_diag,
+            "backtest_base_cost": backtest_summary(base_bt),
+            "cost_sensitivity": cost_sensitivity,
         }
+
+        if model_name == "ridge":
+            hac = ic_diag["hac"]
+            model_summary["exp001_primary_acceptance"] = {
+                "mean_ic_positive": bool(ic_diag["mean"] > 0),
+                "hac_two_sided_p_lt_0_05": bool(hac["p_value"] < 0.05),
+                "median_fold_ic_positive": bool(ic_diag["median_fold_ic"] > 0),
+                "positive_year_fraction_ge_0_60": bool(
+                    ic_diag["positive_year_fraction"] >= 0.60
+                ),
+            }
+            gates = model_summary["exp001_primary_acceptance"]
+            model_summary["exp001_primary_pass"] = bool(all(gates.values()))
+
+        summary["models"][model_name] = model_summary
 
     (outdir / "summary.json").write_text(json.dumps(summary, indent=2))
     print(json.dumps(summary, indent=2))
-    print("\nHoldout remains LOCKED. Do not evaluate it until the final specification is frozen.")
+    print("\nHoldout remains LOCKED. No hold-out predictions or scores were produced.")
 
 
 if __name__ == "__main__":

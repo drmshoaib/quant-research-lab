@@ -11,6 +11,8 @@
   "models": ["ridge", "hist_gb"],
   "ridge_alpha": 10.0,
   "cost_bps": 5.0,
+  "cost_sensitivity_bps": [0, 2, 5, 10, 20],
+  "min_year_ic_days": 20,
   "gross_limit": 1.0,
   "max_abs_weight": 0.08,
   "random_state": 42
