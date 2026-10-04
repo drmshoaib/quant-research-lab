@@ -1,0 +1,144 @@
+{
+  "manifest_version": "v0.2-final-development",
+  "status": "development_frozen_holdout_locked",
+  "freeze_date": "2026-10-04",
+  "data": {
+    "provider": "Yahoo/yfinance",
+    "price_adjustment": "auto_adjust=True",
+    "config_start": "2010-01-01",
+    "config_end_exclusive": "2026-10-03",
+    "actual_first_date": "2010-01-04",
+    "actual_last_date": "2026-10-02",
+    "rows": 126390,
+    "symbols": 30,
+    "market_data_sha256": "ec782ac2cd812a6d81abcbf9cbcdecdd448ab8822b585fbd07c3a74968a3bbd3",
+    "source_workflow_run": 37189218641
+  },
+  "universe": {
+    "path": "data/universe_etf.csv",
+    "git_blob_sha": "c2a2021cb376422a3e4860e10beebdb68bd48114",
+    "n_symbols": 30
+  },
+  "holdout": {
+    "path": "configs/holdout_dates.csv",
+    "git_blob_sha": "36bbca2273d59773640a83fc88e1f947cc3c4ace",
+    "n_decision_dates": 252,
+    "start": "2025-09-24",
+    "end": "2026-09-24",
+    "evaluated": false,
+    "rule": "Evaluate once after the development freeze; no post-holdout tuning."
+  },
+  "target": {
+    "primary_horizon_sessions": 5,
+    "decision_time": "after close at t",
+    "entry": "open at t+1",
+    "exit": "open at t+6",
+    "raw_formula": "log(O[t+6] / O[t+1])",
+    "modelling_target": "raw forward return minus same-date full-universe cross-sectional mean",
+    "group_neutral_target_status": "robustness diagnostic only; not final benchmark target"
+  },
+  "features": [
+    {
+      "name": "ret_1",
+      "formula": "log(close_t) - log(close_t-1)"
+    },
+    {
+      "name": "mom_20",
+      "formula": "log(close_t) - log(close_t-20)"
+    },
+    {
+      "name": "mom_60",
+      "formula": "log(close_t) - log(close_t-60)"
+    },
+    {
+      "name": "vol_20",
+      "formula": "population std of 1-session log returns over 20 sessions * sqrt(252)"
+    },
+    {
+      "name": "vol_60",
+      "formula": "population std of 1-session log returns over 60 sessions * sqrt(252)"
+    },
+    {
+      "name": "range_1",
+      "formula": "(high_t - low_t) / close_t"
+    },
+    {
+      "name": "volume_z_20",
+      "formula": "20-session z-score of log1p(volume_t)"
+    },
+    {
+      "name": "drawdown_60",
+      "formula": "close_t / rolling_60_session_max(close) - 1"
+    }
+  ],
+  "excluded_from_final_feature_set": [
+    "mom_5"
+  ],
+  "model": {
+    "class": "sklearn.ensemble.HistGradientBoostingRegressor",
+    "learning_rate": 0.05,
+    "max_iter": 250,
+    "max_leaf_nodes": 15,
+    "min_samples_leaf": 40,
+    "l2_regularization": 1,
+    "random_state": 42,
+    "hyperparameter_search": false
+  },
+  "validation": {
+    "scheme": "expanding purged walk-forward",
+    "min_train_days": 756,
+    "test_days": 63,
+    "step_days": 63,
+    "train_test_purge_days": 6,
+    "pre_holdout_embargo_days": 6,
+    "development_scored_dates": 3087,
+    "primary_metric": "daily cross-sectional Spearman rank IC",
+    "inference": "Newey-West/HAC",
+    "primary_hac_lag": 4
+  },
+  "portfolio": {
+    "status": "secondary diagnostic",
+    "construction": "daily dollar-neutral rank cohort portfolios",
+    "gross_limit": 1,
+    "cohort_per_name_abs_cap": 0.08,
+    "horizon_translation": "five equal-capital staggered sleeves",
+    "final_execution_benchmark": "instant target execution"
+  },
+  "transaction_costs": {
+    "base_one_way_bps": 5,
+    "sensitivity_one_way_bps": [
+      0,
+      2,
+      5,
+      10,
+      20
+    ],
+    "charge": "cost_bps/10000 * sum(abs(w_t - w_t-1))"
+  },
+  "frozen_development_result": {
+    "mean_rank_ic": 0.02701,
+    "hac_t": 3.922,
+    "hac_p": 0.0000878,
+    "median_fold_ic": 0.02766,
+    "positive_development_year_fraction": 0.923,
+    "annualized_turnover": 41.91,
+    "annualized_return_0bps": 0.0225,
+    "annualized_return_5bps": 0.0015,
+    "sharpe_5bps": 0.04,
+    "approx_break_even_one_way_bps": 5.37
+  },
+  "robustness_record": {
+    "EXP006_overall_pass": false,
+    "EXP006_failure": "aggregate IC depended materially on the US risk-asset block under the pre-registered leave-one-group-out rule",
+    "EXP007_overall_pass": false,
+    "EXP007_failure": "group-neutral equal-weight non-US composite HAC p=0.0501247 versus pre-registered p<0.05 gate",
+    "symbol_identity_placebo_p": 0.001,
+    "group_neutral_four_group_ic_retention": 0.8632
+  },
+  "code_and_provenance": {
+    "final_development_evidence_workflow_sha": "56b22b231d3e3e6c485b680cba34ed2627713c74",
+    "development_record_parent_sha": "2b8c516f4d4e13fa9eae34f3df39028f1225b2db",
+    "baseline_config_git_blob_sha": "82be787505b677649216d96f5aeb588a66bc68a8",
+    "research_log": "docs/research_log.md"
+  }
+}
