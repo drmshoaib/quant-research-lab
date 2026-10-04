@@ -1,0 +1,54 @@
+name: EXP-001 Frozen Baseline
+
+on:
+  push:
+    paths:
+      - ".github/workflows/exp001.yml"
+
+jobs:
+  exp001:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[data]'
+
+      - name: Recreate and verify frozen data snapshot
+        run: |
+          python scripts/freeze_holdout.py --output /tmp/holdout_dates.csv
+          cmp /tmp/holdout_dates.csv configs/holdout_dates.csv
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          meta = json.loads(Path("configs/data_snapshot.json").read_text())
+          path = Path("outputs/market_data.csv")
+          actual = hashlib.sha256(path.read_bytes()).hexdigest()
+          expected = meta["sha256"]
+          print(f"EXPECTED_SHA256={expected}")
+          print(f"ACTUAL_SHA256={actual}")
+          if actual != expected:
+              raise SystemExit("Frozen market-data checksum mismatch; refusing to run EXP-001.")
+          print("Frozen data snapshot and holdout manifest verified.")
+          PY
+
+      - name: Run EXP-001 development baseline
+        run: python scripts/run_baseline.py --data outputs/market_data.csv --output-dir outputs/exp001
+
+      - name: Print EXP-001 summary
+        run: |
+          echo "EXP001_SUMMARY_BEGIN"
+          cat outputs/exp001/summary.json
+          echo "EXP001_SUMMARY_END"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exp001-development-results
+          path: outputs/exp001
+          retention-days: 14
