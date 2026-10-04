@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from .portfolio import rank_weights
@@ -61,6 +62,64 @@ def staggered_weights(
     out = live.stack()
     out.index = out.index.set_names(["date", "symbol"])
     return out.sort_index().rename("weight")
+
+
+def append_liquidation_row(weights: pd.Series, *, liquidation_date: pd.Timestamp) -> pd.Series:
+    """Append a zero-weight row after the final portfolio date."""
+    if weights.empty:
+        return weights.copy()
+    if not isinstance(weights.index, pd.MultiIndex) or list(weights.index.names) != ["date", "symbol"]:
+        raise ValueError("weights must use a MultiIndex named ['date', 'symbol']")
+    date = pd.Timestamp(liquidation_date)
+    wide = weights.unstack("symbol").sort_index().fillna(0.0)
+    if date <= pd.Timestamp(wide.index[-1]):
+        raise ValueError("liquidation_date must be after the final weight date")
+    wide.loc[date] = 0.0
+    out = wide.sort_index().stack()
+    out.index = out.index.set_names(["date", "symbol"])
+    return out.sort_index().rename(weights.name or "weight")
+
+
+def partial_adjustment_weights(
+    target_weights: pd.Series,
+    *,
+    adjustment_rate: float,
+    force_final_zero: bool = False,
+) -> pd.Series:
+    """Move a fixed fraction toward each live target portfolio.
+
+    The recursion is causal:
+        w_t = (1-lambda) w_{t-1} + lambda w*_t.
+
+    If force_final_zero=True, the final target row must be all zeros and the
+    actual portfolio is liquidated fully on that row. This is used only for the
+    pre-declared terminal liquidation inside the development embargo.
+    """
+    if not 0.0 < adjustment_rate <= 1.0:
+        raise ValueError("adjustment_rate must lie in (0, 1]")
+    if target_weights.empty:
+        return target_weights.copy()
+    if not isinstance(target_weights.index, pd.MultiIndex) or list(target_weights.index.names) != ["date", "symbol"]:
+        raise ValueError("target_weights must use a MultiIndex named ['date', 'symbol']")
+
+    target = target_weights.unstack("symbol").sort_index().fillna(0.0)
+    if force_final_zero and not np.allclose(target.iloc[-1].to_numpy(dtype=float), 0.0):
+        raise ValueError("force_final_zero requires an all-zero final target row")
+
+    actual = pd.DataFrame(0.0, index=target.index, columns=target.columns)
+    previous = np.zeros(target.shape[1], dtype=float)
+    for i, (_, row) in enumerate(target.iterrows()):
+        desired = row.to_numpy(dtype=float)
+        if force_final_zero and i == len(target) - 1:
+            current = np.zeros_like(previous)
+        else:
+            current = (1.0 - adjustment_rate) * previous + adjustment_rate * desired
+        actual.iloc[i] = current
+        previous = current
+
+    out = actual.stack()
+    out.index = out.index.set_names(["date", "symbol"])
+    return out.sort_index().rename(target_weights.name or "weight")
 
 
 def run_backtest(
