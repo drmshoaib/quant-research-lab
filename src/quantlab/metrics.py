@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -29,6 +30,54 @@ def hac_mean_test(series: pd.Series, maxlags: int = 4) -> dict[str, float]:
     X = np.ones((len(s), 1))
     fit = sm.OLS(s.to_numpy(), X).fit(cov_type="HAC", cov_kwds={"maxlags": maxlags})
     return {"mean": float(fit.params[0]), "t_stat": float(fit.tvalues[0]), "p_value": float(fit.pvalues[0])}
+
+
+def newey_west_automatic_lag(n_obs: int) -> int:
+    """Newey and West's (1994) rule-of-thumb bandwidth, floor(4 (T/100)^(2/9)).
+
+    For the development IC series (T = 3087) this gives 8. It is a data-size
+    rule, not a model of the dependence, and is used here as one row of a
+    lag-sensitivity table rather than as the single registered lag.
+    """
+    if n_obs < 1:
+        raise ValueError("n_obs must be positive")
+    return int(math.floor(4.0 * (n_obs / 100.0) ** (2.0 / 9.0)))
+
+
+def hac_lag_sensitivity(
+    series: pd.Series,
+    lags: Sequence[int] = (0, 4, 8, 10, 20),
+    *,
+    include_automatic: bool = True,
+) -> pd.DataFrame:
+    """Mean, HAC standard error, t-statistic and p-value of a series for several lags.
+
+    Lag 0 is the ordinary (iid) standard error. The Bartlett kernel at lag L
+    understates the long-run variance of a series whose dependence extends
+    beyond L; for an h-session overlapping target the dependence reaches lag
+    h-1 and the registered v0.2 lag L = h-1 recovers only (2h^2+1)/(3h^2) of it
+    in the idealised model (see docs/errata.md, A2). A table across lags shows
+    how much a conclusion depends on that choice.
+    """
+    s = pd.Series(series, dtype=float).dropna()
+    rows = []
+    wanted = [int(k) for k in lags]
+    if include_automatic:
+        wanted.append(newey_west_automatic_lag(len(s)))
+    for lag in sorted(set(wanted)):
+        test = hac_mean_test(s, maxlags=lag)
+        se = test["mean"] / test["t_stat"] if np.isfinite(test["t_stat"]) and test["t_stat"] != 0 else math.nan
+        rows.append(
+            {
+                "lag": lag,
+                "mean": test["mean"],
+                "se": float(se),
+                "t_stat": test["t_stat"],
+                "p_value": test["p_value"],
+                "automatic": bool(include_automatic and lag == newey_west_automatic_lag(len(s))),
+            }
+        )
+    return pd.DataFrame(rows).set_index("lag")
 
 
 def rank_ic_diagnostics(

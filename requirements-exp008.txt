@@ -1,0 +1,9 @@
+# Pinned environment for EXP-008 (and for reproducing the frozen v0.2 control row).
+# The v0.2 results were produced with unpinned "latest" versions; EXP-008's first
+# gate is that the control reproduces mean IC 0.02701 under these pins, which also
+# records the versions in outputs/exp008/summary.json.
+numpy==2.5.3
+pandas==3.0.5
+scipy==1.18.1
+scikit-learn==1.9.1
+statsmodels==0.15.0

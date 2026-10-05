@@ -170,6 +170,100 @@ def global_symbol_permutation_test(
     )
 
 
+def _centred_rank_matrices(predictions: pd.DataFrame):
+    """Shared preparation for the two placebo tests: centred rank matrices and norms."""
+    required = {"y_true", "y_pred"}
+    missing = required.difference(predictions.columns)
+    if missing:
+        raise ValueError(f"predictions missing columns: {sorted(missing)}")
+    truth = predictions["y_true"].unstack("symbol").sort_index()
+    score = predictions["y_pred"].unstack("symbol").reindex(index=truth.index, columns=truth.columns)
+    complete = truth.notna().all(axis=1) & score.notna().all(axis=1)
+    truth = truth.loc[complete]
+    score = score.loc[complete]
+    if truth.empty:
+        raise ValueError("no complete dates available for permutation test")
+    if truth.shape[1] < 4:
+        raise ValueError("permutation test requires at least four symbols")
+    tr = truth.rank(axis=1, method="average").to_numpy(dtype=float)
+    sr = score.rank(axis=1, method="average").to_numpy(dtype=float)
+    tc = tr - tr.mean(axis=1, keepdims=True)
+    sc = sr - sr.mean(axis=1, keepdims=True)
+    denominator = np.sqrt(np.square(tc).sum(axis=1)) * np.sqrt(np.square(sc).sum(axis=1))
+    if np.any(denominator <= 0):
+        raise ValueError("degenerate rank vectors in permutation test")
+    return tc, sc, denominator, truth.shape
+
+
+def global_date_permutation_test(
+    predictions: pd.DataFrame,
+    *,
+    n_permutations: int = 999,
+    seed: int = 20261005,
+    method: str = "shift",
+    min_shift: int = 21,
+) -> PermutationResult:
+    """Timing placebo: realign the whole cross-section of scores to the wrong dates.
+
+    This is the complement of ``global_symbol_permutation_test``. That test
+    keeps each symbol's score path intact and relabels *symbols*, so a static
+    asset-class tilt (scores that never change) is rejected by it. This test
+    keeps each date's cross-section of scores intact and relabels *dates*, so a
+    static tilt is invariant under the null and cannot be rejected: whatever
+    IC survives here is attributable to *when* the scores said what they said.
+
+    Null hypothesis: the scores carry no date-specific information about the
+    outcomes, i.e. the mean IC would be unchanged if the score cross-sections
+    were attached to other dates.
+
+    method="shift" (default): each replicate applies one circular shift of at
+    least ``min_shift`` sessions to the score matrix. Shifting preserves the
+    serial dependence of the score paths (their autocorrelation, and that of
+    the overlapping targets), so the null distribution reflects the same
+    dependence as the observed statistic. ``min_shift`` should exceed the
+    memory of the scores and the target horizon (21 sessions is about a month,
+    well beyond h+1 = 6 and the 60-session feature windows' typical
+    autocorrelation of the ranks); with T dates there are T - 2*min_shift + 1
+    admissible shifts, so for large n_permutations shifts repeat.
+
+    method="permute": a single random permutation of dates per replicate. It
+    destroys serial dependence and is therefore anti-conservative when scores
+    are persistent; it is provided for comparison and teaching, not as the
+    primary placebo.
+    """
+    if n_permutations < 1:
+        raise ValueError("n_permutations must be >= 1")
+    if method not in {"shift", "permute"}:
+        raise ValueError("method must be 'shift' or 'permute'")
+    tc, sc, denominator, (n_dates, n_symbols) = _centred_rank_matrices(predictions)
+    if method == "shift" and n_dates < 2 * min_shift + 1:
+        raise ValueError("not enough dates for the requested minimum shift")
+
+    observed_mean = float(((tc * sc).sum(axis=1) / denominator).mean())
+    rng = np.random.default_rng(seed)
+    null = np.empty(n_permutations, dtype=float)
+    for i in range(n_permutations):
+        if method == "shift":
+            k = int(rng.integers(min_shift, n_dates - min_shift + 1))
+            moved = np.roll(sc, k, axis=0)
+        else:
+            moved = sc[rng.permutation(n_dates), :]
+        # Each date's own norm is unchanged by moving whole rows, so the denominator
+        # must pair the truth norm of date t with the score norm of the row now at t.
+        score_norm = np.sqrt(np.square(moved).sum(axis=1))
+        truth_norm = denominator / np.sqrt(np.square(sc).sum(axis=1))
+        null[i] = float(((tc * moved).sum(axis=1) / (truth_norm * score_norm)).mean())
+
+    p = float((1 + np.sum(null >= observed_mean)) / (n_permutations + 1))
+    return PermutationResult(
+        observed_mean_ic=observed_mean,
+        null_mean_ics=null,
+        empirical_p_value=p,
+        dates_used=int(n_dates),
+        symbols_used=int(n_symbols),
+    )
+
+
 def broad_asset_group_map(universe: pd.DataFrame) -> dict[str, list[str]]:
     """Map the repository's ETF taxonomy into the four EXP-006 broad groups."""
     if not {"symbol", "group"}.issubset(universe.columns):

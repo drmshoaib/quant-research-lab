@@ -17,7 +17,9 @@ The frozen development model is an eight-feature `HistGradientBoostingRegressor`
 
 The evidence is statistically interesting but **not a production trading result**. Under corrected arithmetic-return portfolio accounting, the instant five-sleeve benchmark earns about **2.34% annualised before costs** and **0.25% at 5 bps one way**, with annualised turnover **41.91** and Sharpe **0.065**. Cross-asset robustness is also incomplete: EXP-006 and EXP-007 each fail one pre-registered robustness condition.
 
-**The final 252-date hold-out remains locked and unevaluated.**
+**The final 252-date hold-out remains locked and unevaluated.** Its single evaluation is
+pre-registered in [docs/holdout_analysis_plan.md](docs/holdout_analysis_plan.md) (hash-pinned;
+`scripts/evaluate_holdout.py` is dry-run only unless explicitly unlocked).
 
 Learn or review the full mathematics in the **[undergraduate mathematical guide](docs/mathematical_guide/README.md)**. It derives the returns, features, Ridge and gradient boosting models, purged walk-forward validation, HAC/Newey-West inference, Spearman IC, multiple-testing control, portfolio construction, transaction costs, constrained optimisation and robustness tests, with direct links to the Python implementation and a worked example.
 
@@ -30,6 +32,8 @@ Read the evidence in:
 - [Portfolio-accounting correction](docs/accounting_correction.md)
 - [Research protocol](docs/research_protocol.md)
 - [Errata and known issues](docs/errata.md) (independent review, October 2026)
+- [Hold-out analysis plan](docs/holdout_analysis_plan.md) (registered 5 October 2026, not yet run)
+- EXP-008 methods re-run: registered in the research log, runs in CI (`.github/workflows/exp008.yml`), awaiting execution
 
 ## Research discipline
 
@@ -94,7 +98,7 @@ pytest
 
 - **v0.1:** methodology scaffold and leakage-safe validation.
 - **v0.2:** frozen ETF development programme, EXP-001 through EXP-007, robustness work and research note.
-- **Current state:** development specification frozen; hold-out not yet evaluated.
+- **Current state:** development specification frozen; EXP-008 (methods re-run) registered and awaiting its CI execution; hold-out analysis plan registered; hold-out not yet evaluated.
 - **Future:** one-time hold-out decision, then point-in-time equity research and risk-aware portfolio construction as separate phases.
 
 ## Scope

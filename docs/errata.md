@@ -20,7 +20,10 @@ of trees fitted; `random_state` affects the result; and the model was fitted on 
 training block. None of this was stated in the protocol, the research note or the manifest.
 *Fix for a future phase:* set `early_stopping` explicitly, record `n_iter_` per fold and pin
 the scikit-learn version. The constructor now writes the value out explicitly, with a
-comment, so the behaviour is visible without changing it.
+comment, so the behaviour is visible without changing it. **Registered follow-up:** EXP-008
+(`docs/research_log.md`, `scripts/run_exp008.py`, `.github/workflows/exp008.yml`) re-runs the
+development evaluation with early stopping off and with a time-ordered validation block,
+records the trees fitted per fold, and pins library versions (`requirements-exp008.txt`).
 
 ### A2. Registered HAC lag understates the standard error
 The protocol registers Newey–West lag `L = h − 1 = 4` for the five-session horizon. Under
@@ -32,13 +35,17 @@ Applied heuristically, the headline `t = 3.922` becomes about `3.2` (`p ≈ 0.00
 10- and 20-session horizon p-values (0.0082, 0.0135) would rise to roughly 0.03–0.04; and
 the EXP-007 near miss (`p = 0.0501`) would be a clear miss. The registered results are
 reported unchanged. *Fix:* a lag-sensitivity table (e.g. `L ∈ {4, 8, 10, 20}`) or a
-data-driven lag in any future phase; see `docs/mathematical_guide/03` §7.
+data-driven lag in any future phase; see `docs/mathematical_guide/03` §7. **Registered
+follow-up:** EXP-008 reports lag tables for every variant with lag 10 as primary; the
+hold-out plan uses lag 10 as its primary inference lag.
 
 ### A3. The Ridge "baseline" is effectively OLS
 scikit-learn's Ridge objective is not divided by the sample size, so `alpha = 10` on
 22,680–113,400 standardised rows shrinks coefficients by well under 1% unless the feature
 correlation matrix has an eigenvalue of order 10⁻⁴. The EXP-001 comparison is therefore
 "OLS versus boosting", which does not change its conclusion but should be described as such.
+**Registered follow-up:** EXP-008 adds `ridge_v03` with `alpha = 0.1 · n_train` (shrinkage
+λ/(λ+0.1) per standardised direction, independent of n) as a comparator row.
 
 ### A4. pruned8 was selected after its result had been seen
 EXP-003's `pruned8` is identical to EXP-002's "drop `mom_5`" ablation (same data, folds and
@@ -46,11 +53,14 @@ seed), whose IC (0.02624 + 0.00077 = 0.02701) was therefore already known when E
 registered. The selection step is mitigated by being a single, pre-declared rule and by the
 locked hold-out, but it is a selection step and is now stated as one.
 
-### A5. The hold-out analysis plan is incomplete
-The manifest fixes the hold-out dates but not: whether the model is refitted once on all
+### A5. The hold-out analysis plan was incomplete (closed 5 October 2026)
+The manifest fixed the hold-out dates but not: whether the model is refitted once on all
 development data or walk-forward continues; the test's sidedness and level; what counts as
-confirmation or failure. A 252-date hold-out has only about 30% power to detect `IC = 0.027`
-at the 5% level (one-sided). *Fix:* pre-register the hold-out analysis before unlocking.
+confirmation or failure. A 252-date hold-out has only about 24–30% power to detect
+`IC = 0.027` at the 5% level (one-sided). **Closed:** `docs/holdout_analysis_plan.md`
+(hash-pinned in `configs/holdout_analysis_plan.json`) now fixes all of these, and
+`scripts/evaluate_holdout.py` enforces them, is locked by default, dry-runs on development
+data and refuses a second run. The hold-out itself remains unevaluated.
 
 ### A6. Smaller statistical caveats
 - The EXP-002 ablation tests share the full-model IC series; Benjamini–Hochberg relies on
@@ -60,6 +70,8 @@ at the 5% level (one-sided). *Fix:* pre-register the hold-out analysis before un
   0.71 and 0.50), so horizon robustness is not independent evidence.
 - The symbol-identity permutation tests "no symbol-specific information in the scores"; a
   static asset-class tilt would also reject that null. It does not establish timing skill.
+  **Addressed:** `robustness.global_date_permutation_test` (a circular-shift timing placebo
+  under which a static tilt is invariant) is part of EXP-008 and of the hold-out plan.
 - The subperiod rule "two of three blocks with p < 0.05" is passed by a perfectly stable
   signal of the observed strength only about two thirds of the time; block 3's p = 0.063
   is consistent with no decay. Under the lag correction of A2 the block p-values become
@@ -71,6 +83,12 @@ at the 5% level (one-sided). *Fix:* pre-register the hold-out analysis before un
 
 ## B. Code defects corrected (no effect on frozen results)
 
+- **`targets.py` shifted by rows, not sessions** (fixed 5 October 2026). `forward_open_return`
+  and `next_open_to_open_simple_return` shifted each symbol's own rows, so a missing bar would
+  have been skipped silently. Both now reindex every symbol to the union session calendar
+  before shifting (a missing entry or exit bar gives NaN); the simple return is `expm1` of the
+  one-session log return. The frozen panel is balanced (126,390 = 30 × 4,213 rows), so the
+  old and new functions agree on it (pinned by a test) and no reported number changes.
 - **`portfolio.rank_weights` could exceed the per-name cap when scores tied** (re-demeaning
   after an asymmetric clip). Fixed by scaling the heavier side down to the lighter one after
   clipping; identical output for distinct scores (verified numerically). Ties among
@@ -90,12 +108,6 @@ at the 5% level (one-sided). *Fix:* pre-register the hold-out analysis before un
 
 ## C. Known fragilities left unchanged
 
-- **`targets.py` shifts by rows, not sessions.** `forward_open_return` and
-  `next_open_to_open_simple_return` use `shift` within each symbol, which silently jumps over
-  a missing bar. The frozen panel is balanced (126,390 = 30 × 4,213 rows), so all results are
-  correct. A calendar-robust version (reindex each symbol to the union of dates before
-  shifting) was written and tested during the review; it was not merged into `src/` in
-  this revision.
 - `signals.causal_rank_ewma` "centred" ranks have mean `1/(2N_t)`, not 0; harmless because
   `rank_weights` re-ranks and demeans.
 - `group_neutral.composite_ic_diagnostics` averages over whichever groups are present on a

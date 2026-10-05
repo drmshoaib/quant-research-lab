@@ -6,28 +6,40 @@ import pandas as pd
 from .data import validate_panel
 
 
+def _opens_on_common_calendar(panel: pd.DataFrame) -> pd.DataFrame:
+    """Opening prices as a dates x symbols table on the union session calendar.
+
+    Every symbol is reindexed to the union of all dates in the panel, so a
+    missing bar becomes NaN instead of being skipped. Shifting this table by k
+    rows then always means "k sessions later", even for an unbalanced panel.
+    (Until October 2026 the functions below shifted each symbol's own rows,
+    which silently jumped over missing sessions; the frozen v0.2 panel is
+    balanced, 126,390 = 30 x 4,213 rows, so no reported result was affected.)
+    """
+    return panel["open"].astype(float).unstack("symbol").sort_index()
+
+
+def _long(wide: pd.DataFrame, name: str, like: pd.Index) -> pd.Series:
+    out = wide.stack(future_stack=True)
+    out.index = out.index.set_names(["date", "symbol"])
+    # Return exactly the (date, symbol) rows of the input panel, in sorted order.
+    return out.reindex(like).sort_index().rename(name)
+
+
 def forward_open_return(panel: pd.DataFrame, horizon: int = 5) -> pd.Series:
     """Forward log return aligned to decision date t.
 
     Information is assumed known after the close at t. Execution occurs at the
-    next session's open (t+1); exit is at the open h sessions later. Thus the
-    target never uses the current close as an executable price.
+    next session's open (t+1); exit is at the open h sessions after entry, that
+    is at the open of session t+h+1. The target never uses the current close as
+    an executable price. If the entry or exit bar is missing the value is NaN.
     """
     if horizon < 1:
         raise ValueError("horizon must be >= 1")
     panel = validate_panel(panel)
-    values: list[pd.Series] = []
-    for symbol, g in panel.groupby(level="symbol", sort=False):
-        g = g.droplevel("symbol").sort_index()
-        entry = g["open"].shift(-1)
-        exit_ = g["open"].shift(-(horizon + 1))
-        y = np.log(exit_ / entry)
-        y.name = "forward_return"
-        y = y.to_frame()
-        y["symbol"] = symbol
-        y["date"] = y.index
-        values.append(y.reset_index(drop=True).set_index(["date", "symbol"])["forward_return"])
-    return pd.concat(values).sort_index()
+    opens = _opens_on_common_calendar(panel)
+    y = np.log(opens.shift(-(horizon + 1)) / opens.shift(-1))
+    return _long(y, "forward_return", panel.index)
 
 
 def forward_relative_return(panel: pd.DataFrame, horizon: int = 5) -> pd.Series:
@@ -72,24 +84,11 @@ def next_open_to_open_simple_return(panel: pd.DataFrame) -> pd.Series:
     """One-session realised simple return for portfolio P&L.
 
     A position selected after the close at t enters at open t+1 and earns the
-    simple return to open t+2.
+    simple return to open t+2. This equals exp(r) - 1 for the one-session log
+    return and is computed on the same common session calendar.
     """
-    panel = validate_panel(panel)
-    values: list[pd.Series] = []
-    for symbol, g in panel.groupby(level="symbol", sort=False):
-        g = g.droplevel("symbol").sort_index()
-        entry = g["open"].shift(-1)
-        exit_ = g["open"].shift(-2)
-        r = exit_ / entry - 1.0
-        r.name = "realized_return"
-        frame = r.to_frame()
-        frame["symbol"] = symbol
-        frame["date"] = frame.index
-        values.append(
-            frame.reset_index(drop=True)
-            .set_index(["date", "symbol"])["realized_return"]
-        )
-    return pd.concat(values).sort_index()
+    r = forward_open_return(panel, horizon=1)
+    return np.expm1(r).rename("realized_return")
 
 
 def forward_group_relative_return(

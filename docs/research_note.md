@@ -208,6 +208,10 @@ If final evaluation is authorised, it must use `configs/final_specification_v0.2
 
 The hold-out is to be evaluated **once**. The result must be reported unchanged even if weak, insignificant or negative. No post-holdout feature, model, threshold or execution retuning is permitted within v0.2.
 
+**Analysis plan (registered 5 October 2026).** The choices the paragraph above left open are now fixed in [`docs/holdout_analysis_plan.md`](holdout_analysis_plan.md), hash-pinned in `configs/holdout_analysis_plan.json` and enforced by `scripts/evaluate_holdout.py`, which is locked by default and refuses to run twice: the frozen pruned8 model is fitted **once** on all development data and scores the 252 dates; the primary test is **one-sided at 5%** on the hold-out mean rank IC with Newey–West **lag 10** (the development lag 4 is reported as sensitivity, see `docs/errata.md` A2); a binding four-row decision table (confirmed / consistent-inconclusive / not replicated / contradicted) is stated in advance; and the plan records that the test has only about **24% power** if the true IC equals the development estimate, so "consistent, inconclusive" is the most likely outcome even if the signal is real. The portfolio, the placebos and the corrected `hist_gb_v03` model are reported as secondary evidence without gates.
+
+**Methods sensitivity (EXP-008, registered 5 October 2026).** A methods re-run on development data — early stopping off / time-ordered, lag-sensitivity tables, a Ridge penalty fixed per observation and a timing placebo — is registered in the research log and runs as `.github/workflows/exp008.yml` against the frozen artefact. Its table will be quoted here when complete; it changes none of the development numbers above.
+
 ## 13. Conclusion
 
 The most important outcome is not a high Sharpe ratio. It is a reproducible chain of evidence separating a statistically detectable nonlinear ranking signal from the much harder problem of converting that signal into robust net returns.

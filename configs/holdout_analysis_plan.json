@@ -1,0 +1,74 @@
+{
+  "plan_version": "v0.2-holdout-plan-1",
+  "registered": "2026-10-05",
+  "status": "registered_not_evaluated",
+  "document": "docs/holdout_analysis_plan.md",
+  "document_sha256": "4427d38b5763b768a8aa1fad4f0dc909018d54f3c61b5c389b68483a5ba97d22",
+  "frozen_inputs_sha256": {
+    "configs/holdout_dates.csv": "d871ae92ff1462fe2fe2da7e8ebeddb540109e40e5ac0e7a10ea193708fae0b5",
+    "data/universe_etf.csv": "e73fd3f28e4b2cfaf37ac70f09f32a6d7391369205fdcc0243ffaa0962d5390a",
+    "configs/final_specification_v0.2.json": "a9ee95d0aff90a4859451b91a6a4d1ec14b75036e0251a50b14c33124043479f"
+  },
+  "market_data_sha256": "ec782ac2cd812a6d81abcbf9cbcdecdd448ab8822b585fbd07c3a74968a3bbd3",
+  "fitting_scheme": "fit_once_on_all_development_data",
+  "decision_model": "hist_gb",
+  "secondary_model": "hist_gb_v03",
+  "features": [
+    "ret_1",
+    "mom_20",
+    "mom_60",
+    "vol_20",
+    "vol_60",
+    "range_1",
+    "volume_z_20",
+    "drawdown_60"
+  ],
+  "horizon": 5,
+  "min_assets": 8,
+  "embargo_days": 6,
+  "primary": {
+    "statistic": "mean daily Spearman rank IC on the 252 hold-out dates",
+    "test": "one-sided, H1: E[IC]>0",
+    "level": 0.05,
+    "hac_lag": 10
+  },
+  "lag_sensitivity": [
+    0,
+    4,
+    8,
+    10,
+    20
+  ],
+  "development_reference": {
+    "mean_ic": 0.02701,
+    "hac_t_lag4": 3.922,
+    "se_lag4": 0.00689,
+    "lag_correction_factor": 1.213,
+    "se_corrected": 0.00836
+  },
+  "decision_table": {
+    "confirmed": "ic_h > 0 and p_h_one_sided < 0.05",
+    "consistent_inconclusive": "ic_h > 0 and p_h_one_sided >= 0.05",
+    "not_replicated": "ic_h <= 0 and z >= -1.645",
+    "contradicted": "z < -1.645, z = (ic_h - 0.02701) / sqrt(0.00836^2 + se_h^2)"
+  },
+  "secondary": {
+    "placebo_permutations": 999,
+    "portfolio_cost_bps": [
+      0,
+      5
+    ],
+    "gross_limit": 1.0,
+    "max_abs_weight": 0.08
+  },
+  "power_statement": {
+    "expected_t_if_true_ic_0_027": 0.92,
+    "one_sided_power_at_5pct": 0.24
+  },
+  "unlock": {
+    "flag": "--unlock",
+    "env_var": "QRL_HOLDOUT_UNLOCK",
+    "env_value": "I_UNDERSTAND_THIS_RUNS_ONCE",
+    "result_file": "outputs/holdout/result.json"
+  }
+}

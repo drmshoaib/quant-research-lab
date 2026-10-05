@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from quantlab.robustness import (
     chronological_ic_blocks,
@@ -54,3 +55,47 @@ def test_global_symbol_permutation_is_reproducible():
     assert a.observed_mean_ic > 0.99
     assert np.allclose(a.null_mean_ics, b.null_mean_ics)
     assert a.empirical_p_value == b.empirical_p_value
+
+
+def _prediction_panel(scores, outcomes):
+    T, N = outcomes.shape
+    dates = pd.bdate_range("2020-01-01", periods=T)
+    symbols = [f"S{i:02d}" for i in range(N)]
+    idx = pd.MultiIndex.from_product([dates, symbols], names=["date", "symbol"])
+    return pd.DataFrame({"y_true": outcomes.ravel(), "y_pred": scores.ravel()}, index=idx)
+
+
+def test_date_permutation_test_is_blind_to_a_static_tilt_but_the_symbol_test_is_not():
+    from quantlab.robustness import global_date_permutation_test, global_symbol_permutation_test
+
+    rng = np.random.default_rng(0)
+    T, N = 300, 12
+    tilt = rng.normal(size=N)
+    outcomes = 0.5 * tilt[None, :] + rng.normal(size=(T, N))
+    scores = np.repeat(tilt[None, :], T, axis=0) + 1e-9 * rng.normal(size=(T, N))
+    pred = _prediction_panel(scores, outcomes)
+    symbol = global_symbol_permutation_test(pred, n_permutations=199)
+    timing = global_date_permutation_test(pred, n_permutations=199)
+    assert symbol.empirical_p_value < 0.05
+    # Moving whole cross-sections to other dates changes nothing for a static tilt.
+    assert np.allclose(timing.null_mean_ics, timing.observed_mean_ic, atol=1e-6)
+    assert timing.empirical_p_value == 1.0
+
+
+def test_date_permutation_test_detects_timing_skill_and_is_valid_under_the_null():
+    from quantlab.robustness import global_date_permutation_test
+
+    rng = np.random.default_rng(1)
+    T, N = 300, 12
+    outcomes = rng.normal(size=(T, N))
+    skilled = _prediction_panel(outcomes + 2.0 * rng.normal(size=(T, N)), outcomes)
+    assert global_date_permutation_test(skilled, n_permutations=199).empirical_p_value < 0.05
+    noise = _prediction_panel(rng.normal(size=(T, N)), outcomes)
+    res = global_date_permutation_test(noise, n_permutations=199, seed=3)
+    assert res.empirical_p_value > 0.05
+    assert res.dates_used == T and res.symbols_used == N
+    # The "permute" variant runs and agrees on the observed statistic.
+    res2 = global_date_permutation_test(noise, n_permutations=50, method="permute")
+    assert np.isclose(res2.observed_mean_ic, res.observed_mean_ic)
+    with pytest.raises(ValueError):
+        global_date_permutation_test(noise, min_shift=200)

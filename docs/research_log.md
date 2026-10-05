@@ -668,3 +668,85 @@ Full audit: `docs/accounting_correction.md`.
 
 The final 252-date hold-out was not accessed.
 
+
+## EXP-008 — Methods re-run: early stopping, inference lag, Ridge scaling, timing placebo
+
+**Date registered:** 5 October 2026  
+**Status:** registered — awaiting execution on the frozen data artefact (`.github/workflows/exp008.yml`)
+
+**Question**  
+Do the frozen v0.2 development conclusions for `pruned8` survive when four methodological
+defects recorded in `docs/errata.md` (A1–A3, A6) are corrected? This is a **methods
+experiment**: it changes no feature, target, fold or portfolio rule, promotes nothing and
+rejects nothing. It re-measures the same signal with corrected instruments.
+
+**What is corrected, and how**
+
+1. *Early stopping (A1).* The v0.2 model used scikit-learn's default `early_stopping="auto"`,
+   which held out a random 10% of training rows and stopped after 10 rounds without
+   improvement. Two corrected variants: `hist_gb_v03` (early stopping **off**: exactly 250
+   trees, deterministic) and `hist_gb_v03_time` (early stopping on a **time-ordered**
+   validation block: the last 10% of distinct training dates, purged by 6 dates, number of
+   trees chosen by `staged_predict`, then refitted on the whole block). The number of trees
+   fitted per fold is recorded for every variant (`*_fold_diagnostics.csv`, column `n_iter`).
+2. *Inference lag (A2).* The registered lag `L = h−1 = 4` understates the long-run variance of
+   the IC series. The **primary** EXP-008 lag is `L = 2h = 10`; a lag-sensitivity table at
+   `L ∈ {0, 4, 8, 10, 20}` plus the Newey–West (1994) automatic lag (8 for T = 3087) is
+   reported for every variant.
+3. *Ridge scaling (A3).* `alpha = 10` on 22,680–113,400 rows shrinks by well under 1%.
+   `ridge_v03` fixes the penalty **per observation**: `alpha = κ·n_train` with κ = 0.1, so a
+   standardised direction with correlation eigenvalue λ is shrunk by λ/(λ+0.1) regardless of n.
+   Reported next to the v0.2 Ridge as a comparator only.
+4. *Timing placebo (A6).* The v0.2 symbol-identity placebo cannot distinguish timing skill from
+   a static asset-class tilt. `global_date_permutation_test` realigns whole score
+   cross-sections to other dates by a circular shift of at least 21 sessions (preserving
+   serial dependence), so a static tilt is invariant under its null. Both placebos are run
+   with 999 replicates on the control and on `hist_gb_v03`.
+5. *Environment (A1).* Library versions are pinned (`requirements-exp008.txt`) and written
+   into `outputs/exp008/summary.json`.
+
+**Signal definition**  
+Unchanged from the frozen specification: `pruned8` features, 5-session relative target,
+purged expanding walk-forward (756/63/63/6), pre-hold-out embargo 6. Development data only.
+
+**Expected direction**  
+Mean rank IC positive for every boosting variant. No directional expectation for the
+difference between variants; the point of the experiment is to measure it.
+
+**Pre-registered gates (all must be stated before the result is seen)**
+
+- **G1 Reproduction.** The control (`hist_gb`, as frozen) must reproduce mean rank IC 0.02701
+  to within 5e-5 under the pinned environment. If it does not, the run is reported as a
+  *failed reproduction* and nothing else in it is interpreted until the cause is found.
+- **G2 Inference.** `hist_gb_v03` mean IC > 0 with lag-10 HAC p < 0.05.
+- **G3 Early stopping.** Both v0.3 boosting variants have mean IC within [0.5, 1.5] × control,
+  and `n_iter` is recorded for every fold.
+- **G4 Timing.** Timing-placebo p ≤ 0.05 for the control and for `hist_gb_v03`.
+
+**Interpretation rules**  
+If G2 fails the development claim is downgraded in the research note to "significant only
+under the registered lag-4 inference"; if G3 fails the v0.2 result is recorded as
+early-stopping-dependent; if G4 fails the research note must say that the evidence is
+consistent with a static cross-sectional tilt rather than timing skill. No gate result changes
+the frozen v0.2 numbers, which remain the development record; EXP-008 is reported alongside
+them. **The hold-out is not touched.**
+
+**Development-only evaluation**  
+`scripts/run_exp008.py` (variants, lags, placebos as above). Runtime: five walk-forward
+runs plus two 999-replicate placebos per boosting variant.
+
+**Result**  
+Pending execution of `.github/workflows/exp008.yml` on the frozen artefact
+(workflow run 37189218641, SHA-256 verified before the run).
+
+**Decision**  
+Not applicable (methods experiment). The research note gains a "Methods sensitivity"
+section quoting the EXP-008 table once the run has completed.
+
+**Commit / output references**  
+Code: `src/quantlab/models.py` (`hist_gb_v03`, `hist_gb_v03_time`, `ridge_v03`),
+`src/quantlab/metrics.py` (`hac_lag_sensitivity`, `newey_west_automatic_lag`),
+`src/quantlab/pipeline.py` (`walk_forward_predictions_with_diagnostics`),
+`src/quantlab/robustness.py` (`global_date_permutation_test`), `scripts/run_exp008.py`,
+`requirements-exp008.txt`, `tests/test_models_v03.py`, `tests/test_robustness.py`.
+Outputs will be attached as the `exp008-methods-results` artefact.
