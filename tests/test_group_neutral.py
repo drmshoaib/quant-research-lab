@@ -92,3 +92,23 @@ def test_equal_weight_group_composite_does_not_weight_by_group_size():
         diag["equal_weight_non_us"]["mean_ic"],
         -1.0,
     )
+
+
+def test_group_composite_requires_all_intended_groups_on_a_date():
+    dates = pd.bdate_range("2024-03-01", periods=3)
+    matrix = pd.DataFrame(
+        {
+            "US_risk_assets": [0.1, 0.2, 0.3],
+            "International_equity": [0.1, np.nan, 0.3],
+            "Fixed_income": [0.1, 0.2, 0.3],
+            "Commodities": [0.1, 0.2, 0.3],
+        },
+        index=dates,
+    )
+    diag = composite_ic_diagnostics(
+        matrix,
+        non_us_groups=["International_equity", "Fixed_income", "Commodities"],
+        hac_lag=1,
+    )
+    assert diag["equal_weight_four_group"]["n_dates"] == 2
+    assert diag["equal_weight_non_us"]["n_dates"] == 2
