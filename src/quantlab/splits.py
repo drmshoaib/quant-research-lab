@@ -32,8 +32,7 @@ class PurgedWalkForward:
             train_end = test_start - self.purge_days
             train = dates[:train_end]
             test = dates[test_start : test_start + self.test_days]
-            if len(train) >= self.min_train_days:
-                yield DateSplit(train_dates=train, test_dates=test)
+            yield DateSplit(train_dates=train, test_dates=test)
             test_start += self.step_days
 
 
