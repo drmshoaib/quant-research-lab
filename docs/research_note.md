@@ -9,13 +9,13 @@
 
 This study asks whether information available at the close of a trading day can rank future relative returns across a fixed universe of 30 liquid ETFs. The design uses next-open execution, purged expanding-window validation, an immutable 252-date final hold-out, pre-registered experiment rules, HAC/Newey-West inference, explicit turnover costs, and a permanent record of negative results.
 
-The strongest development specification is an eight-feature HistGradientBoosting model, **pruned8**, evaluated at a five-session horizon. Across 3,087 out-of-sample development dates it produces mean daily cross-sectional Spearman rank IC **0.02701**, HAC `t=3.922`, `p=8.78e-5`, median fold IC **0.02766**, and positive mean IC in **12 of 13** eligible development years. A 999-replicate global symbol-identity placebo gives empirical one-sided `p=0.001`. The signal is weak at one session but remains statistically significant at 10 and 20 sessions, which is more consistent with a medium-horizon ranking effect than a next-day anomaly.
+The strongest development specification is an eight-feature HistGradientBoosting model, **pruned8**, evaluated at a five-session horizon. Across 3,087 out-of-sample development dates it produces mean daily cross-sectional Spearman rank IC **0.02701**, HAC `t=3.922`, `p=8.78e-5`, median fold IC **0.02766**, and positive mean IC in **12 of 13** eligible development years. A 999-replicate global symbol-identity placebo gives empirical one-sided `p=0.001`. The signal is weak at one session but remains statistically significant at 10 and 20 sessions. EXP-008 shows that the five-session IC remains significant with lag-10 HAC inference and when early stopping is removed or made time-ordered. However, the new timing placebo passes only for the frozen control (`p=0.034`) and fails for the corrected no-early-stopping (`p=0.082`) and time-ordered (`p=0.109`) variants. Cross-sectional structure is therefore better supported than robust date-specific timing skill.
 
 The statistical signal is substantially stronger than the economic backtest. Under the frozen five-sleeve, dollar-neutral rank portfolio, corrected zero-cost annualised arithmetic return is **2.34%**, but annualised turnover is **41.91 times gross notional**. At the pre-specified 5 bps one-way cost, annualised arithmetic net return is only **0.25%** with Sharpe **0.065**, and performance is negative at 10 bps. Several turnover-reduction mechanisms improved cost efficiency, but none satisfied its complete pre-registered promotion rule. The evidence therefore supports a predictive-ranking claim, not a production-ready trading strategy.
 
 Robustness is mixed. Horizon and chronological tests pass, and the symbol-identity placebo is decisively rejected. However, EXP-006 fails its overall rule because removing the 16-name US risk-asset block reduces aggregate IC to **0.01183**, only **43.8%** of the full-universe value, with HAC `p=0.179`. A subsequent group-neutral experiment shows that this weakness is not simply broad asset-class rotation: after removing each broad group's target mean and retraining the model, the equal-weight four-group composite retains **86.3%** of the control within-group IC and remains significant at `p=0.00981`. Nevertheless, its equal-weight non-US composite has `p=0.0501247`, narrowly failing the pre-registered `p<0.05` requirement.
 
-> **Development conclusion:** A statistically significant nonlinear cross-sectional ETF ranking signal exists in the frozen development sample, is strongest at medium horizons, survives temporal and symbol-identity falsification, and retains substantial within-group information after broad asset-class neutralisation. Its economic value is fragile to realistic trading costs, and its cross-asset breadth is not strong enough to satisfy all pre-registered robustness criteria.
+> **Development conclusion:** A statistically significant nonlinear cross-sectional ETF ranking signal exists in the frozen development sample, remains significant under safer HAC inference and explicit early-stopping choices, survives chronological and symbol-identity checks, and retains substantial within-group information after broad asset-class neutralisation. Evidence for genuine date-specific timing is **model-dependent** under the EXP-008 timing placebo. Its economic value is fragile to realistic trading costs, and its cross-asset breadth is not strong enough to satisfy all pre-registered robustness criteria.
 
 The final hold-out has not been inspected.
 
@@ -65,7 +65,7 @@ The final **pruned8** feature set is:
 | `volume_z_20` | 20-session z-score of `log1p(volume)` |
 | `drawdown_60` | close / 60-session rolling peak - 1 |
 
-`mom_5` was removed in EXP-003 because pruned8 was the only reduced specification satisfying all pre-registered statistical eligibility rules. This is not proof that five-day momentum is individually harmful; its leave-one-out improvement in EXP-002 was not statistically significant.
+`mom_5` was removed in EXP-003 because pruned8 was the only reduced specification satisfying all pre-registered statistical eligibility rules. This is not proof that five-day momentum is individually harmful; its leave-one-out improvement in EXP-002 was not statistically significant. Pruned8 is also a **selected development specification**, not an independent confirmation: it is identical to the EXP-002 drop-`mom_5` ablation, whose performance was already visible before EXP-003 was registered. The untouched hold-out is what prevents this selection step from being mistaken for confirmation.
 
 The final development model is `HistGradientBoostingRegressor` with learning rate **0.05**, **250** maximum iterations, **15** maximum leaf nodes, minimum leaf size **40**, L2 regularisation **1.0**, and random seed **42**. No hyperparameter search was performed.
 
@@ -80,7 +80,7 @@ EXP-001 compared a Ridge baseline with the nonlinear model:
 | Median fold IC | 0.00324 | **0.02301** |
 | Positive development years | 53.8% | **84.6%** |
 
-The pre-registered Ridge hypothesis failed. The nonlinear comparator showed significant ranking information and became the focus of subsequent work.
+The pre-registered Ridge hypothesis failed. The nonlinear comparator showed significant ranking information and became the focus of subsequent work. A later methods audit showed that fixed `alpha=10` made Ridge close to OLS at these sample sizes. EXP-008 repeated the comparison with `alpha=0.1*n_train`; the stronger Ridge remained null (mean IC 0.00143, lag-10 p=0.863), so the substantive linear-versus-nonlinear conclusion is unchanged.
 
 EXP-002 used leave-one-feature-out ablation with Benjamini-Hochberg FDR control. `vol_20` and `drawdown_60` were the only individual features satisfying the registered material-contributor rule. `vol_60` had the largest raw IC loss when removed but did not survive the multiple-testing rule.
 
@@ -115,6 +115,23 @@ All three means are positive, although the raw-target aggregate signal weakens o
 
 EXP-006 globally permuted complete prediction-symbol paths **999** times while preserving each date's score distribution and the serial structure of each prediction path. The null distribution had mean **0.00010**, standard deviation **0.00654**, and 95th percentile **0.01141**. The observed IC of **0.02701** produced empirical one-sided `p=0.001`.
 
+## 6A. Methods Sensitivity After Independent Review
+
+EXP-008 was registered after an independent review identified weaknesses in the original early-stopping specification, HAC lag choice, Ridge scaling and placebo design. It used development data only and did not alter the frozen v0.2 numbers.
+
+| Variant | Mean IC | Lag-10 HAC p | Median trees | Timing placebo p |
+|---|---:|---:|---:|---:|
+| Frozen v0.2 control | **0.02701** | **0.000254** | 110 | **0.034** |
+| Early stopping off | **0.02322** | **0.000984** | 250 | 0.082 |
+| Time-ordered early stopping | **0.01830** | **0.0231** | 12 | 0.109 |
+
+The five-session signal remains statistically significant at lag 10 and even lag 20. The original lag-4 standard error was optimistic but not decisive.
+
+Early-stopping design matters quantitatively. The frozen random-row rule used a median 110 trees, while the purged time-ordered rule selected a median 12. Nevertheless, both corrected variants retain positive, statistically significant mean IC under lag-10 inference.
+
+The more important caution is the **timing placebo**. The symbol-identity placebo establishes symbol-specific cross-sectional information, but a static or slowly varying cross-sectional tilt can also reject that null. EXP-008 therefore realigned entire score cross-sections to incorrect dates. The frozen control rejects this timing placebo at 5%, but the two corrected early-stopping variants do not. The pre-registered timing gate fails.
+
+Accordingly, the project supports statistically significant nonlinear **cross-sectional structure**, but robust date-specific timing skill is not established across corrected specifications. See [`docs/exp008_results.md`](exp008_results.md) and [`docs/errata.md`](errata.md).
 ## 7. Asset-Group Dependence and Group-Neutral Falsification
 
 Within-group mean IC in EXP-006 was positive in all four pre-declared broad groups:
@@ -172,6 +189,7 @@ Instant pruned8 therefore remains the formal execution benchmark.
 - **No-trade bands:** moderate filtering improved cost efficiency, but the turnover/alpha trade-off prevented promotion.
 - **EXP-006 overall robustness:** failed because aggregate IC depended materially on inclusion of the US risk-asset block.
 - **EXP-007 overall group-neutral test:** failed because the equal-weight non-US HAC p-value was **0.0501247**, not below the registered 0.05 threshold.
+- **EXP-008 timing gate:** failed because the corrected no-early-stopping model's timing-placebo p-value was **0.082** (time-ordered variant **0.109**), even though both retained significant lag-10 IC.
 
 These failures prevent a stronger claim such as robust cross-asset alpha or a profitable production strategy at realistic costs.
 
@@ -181,13 +199,13 @@ The universe is only 30 ETFs and is fixed rather than a point-in-time equity uni
 
 Yahoo adjusted OHLC is suitable for this research stage but is not an institutional execution dataset. The cost model does not model instrument/date-specific bid-ask spreads, market impact, borrow, financing, taxes, queue position or intraday execution uncertainty. The diagnostic portfolio is dollar neutral but **not** beta-, duration-, volatility- or factor-neutral; equal weight is therefore not equal risk across heterogeneous ETFs.
 
-The model was developed through seven sequential pre-registered experiments on one development sample. Pre-registration constrains but does not eliminate researcher degrees of freedom. The untouched final hold-out is therefore essential if a stronger out-of-sample claim is desired.
+The model was developed through seven sequential development experiments and a subsequent pre-registered methods sensitivity run on the same development sample. Pre-registration constrains but does not eliminate researcher degrees of freedom. In particular, pruned8 reuses an EXP-002 ablation result, and early-stopping choices materially affect model complexity. The untouched final hold-out is therefore essential if a stronger out-of-sample claim is desired.
 
 Statistical significance also does not imply economic materiality. The IC evidence is meaningful, but the portfolio has a narrow transaction-cost margin.
 
 ## 11. Frozen Development Conclusion
 
-> **Using a frozen 30-ETF panel, next-open execution and purged expanding-window validation, a fixed HistGradientBoosting model using eight end-of-day price/volume features produces statistically significant medium-horizon cross-sectional ranking information. The signal survives chronological segmentation, 10- and 20-session horizon tests and a 999-replicate symbol-identity placebo. Much of the within-group signal survives broad asset-class target neutralisation. However, the evidence does not satisfy every pre-registered cross-asset robustness test, and high turnover leaves little net return at a 5 bps one-way cost assumption.**
+> **Using a frozen 30-ETF panel, next-open execution and purged expanding-window validation, an eight-feature HistGradientBoosting specification produces statistically significant medium-horizon cross-sectional ranking information. The five-session result remains significant under lag-10 HAC inference and under no-early-stopping and time-ordered early-stopping variants. It survives chronological segmentation and a 999-replicate symbol-identity placebo, and much of the within-group signal survives broad asset-class target neutralisation. However, corrected variants do not reject the EXP-008 timing placebo, the evidence does not satisfy every pre-registered cross-asset robustness test, and high turnover leaves little net return at a 5 bps one-way cost assumption.**
 
 The study does **not** establish a production-ready trading strategy, robustness to materially higher transaction costs, universe-independent alpha, strong non-US evidence at the registered 5% threshold, or future performance.
 
@@ -210,7 +228,7 @@ The hold-out is to be evaluated **once**. The result must be reported unchanged 
 
 **Analysis plan (registered 5 October 2026).** The choices the paragraph above left open are now fixed in [`docs/holdout_analysis_plan.md`](holdout_analysis_plan.md), hash-pinned in `configs/holdout_analysis_plan.json` and enforced by `scripts/evaluate_holdout.py`, which is locked by default and refuses to run twice: the frozen pruned8 model is fitted **once** on all development data and scores the 252 dates; the primary test is **one-sided at 5%** on the hold-out mean rank IC with Newey–West **lag 10** (the development lag 4 is reported as sensitivity, see `docs/errata.md` A2); a binding four-row decision table (confirmed / consistent-inconclusive / not replicated / contradicted) is stated in advance; and the plan records that the test has only about **24% power** if the true IC equals the development estimate, so "consistent, inconclusive" is the most likely outcome even if the signal is real. The portfolio, the placebos and the corrected `hist_gb_v03` model are reported as secondary evidence without gates.
 
-**Methods sensitivity (EXP-008, registered 5 October 2026).** A methods re-run on development data — early stopping off / time-ordered, lag-sensitivity tables, a Ridge penalty fixed per observation and a timing placebo — is registered in the research log and runs as `.github/workflows/exp008.yml` against the frozen artefact. Its table will be quoted here when complete; it changes none of the development numbers above.
+**Methods sensitivity (EXP-008, completed 16 October 2026).** The frozen control reproduces mean IC 0.02701 and remains significant at lag 10 (p=0.000254). Early stopping off gives IC 0.02322 (p=0.000984); time-ordered early stopping gives IC 0.01830 (p=0.0231). The stronger Ridge remains null. The pre-registered timing gate fails because the no-early-stopping timing-placebo p-value is 0.082. Full results: [`docs/exp008_results.md`](exp008_results.md).
 
 ## 13. Conclusion
 
@@ -224,6 +242,6 @@ That combination of positive and negative evidence is the appropriate basis for 
 
 ### Reproducibility record
 
-The full record is in `docs/research_protocol.md`, `docs/research_log.md`, `docs/exp001_results.md` through `docs/exp007_results.md`, `docs/accounting_correction.md`, `configs/data_snapshot.json`, `configs/holdout_dates.csv`, and `configs/final_specification_v0.2.json`.
+The full record is in `docs/research_protocol.md`, `docs/research_log.md`, `docs/exp001_results.md` through `docs/exp008_results.md`, `docs/errata.md`, `docs/accounting_correction.md`, `configs/data_snapshot.json`, `configs/holdout_dates.csv`, and `configs/final_specification_v0.2.json`.
 
 The final statistical development evidence was produced under workflow commit `56b22b231d3e3e6c485b680cba34ed2627713c74`. Portfolio economics were subsequently recomputed under corrected simple-return accounting in workflow run `37199738636` at code commit `0eb8aacaa1b7dbee555a7d2bcba6b6fe44c0955b`, before any hold-out evaluation.
