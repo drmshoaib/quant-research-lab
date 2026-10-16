@@ -99,3 +99,22 @@ def test_date_permutation_test_detects_timing_skill_and_is_valid_under_the_null(
     assert np.isclose(res2.observed_mean_ic, res.observed_mean_ic)
     with pytest.raises(ValueError):
         global_date_permutation_test(noise, min_shift=200)
+
+
+def test_symbol_permutation_skips_degenerate_all_tied_date():
+    from quantlab.robustness import global_symbol_permutation_test
+
+    dates = pd.bdate_range("2024-01-01", periods=6)
+    symbols = ["A", "B", "C", "D"]
+    rows = []
+    for di, date in enumerate(dates):
+        for si, symbol in enumerate(symbols):
+            score = 1.0 if di == 2 else float(si)
+            rows.append((date, symbol, float(si), score))
+    pred = pd.DataFrame(
+        rows,
+        columns=["date", "symbol", "y_true", "y_pred"],
+    ).set_index(["date", "symbol"])
+    res = global_symbol_permutation_test(pred, n_permutations=49, seed=7)
+    assert res.dates_used == 5
+    assert res.symbols_used == 4
