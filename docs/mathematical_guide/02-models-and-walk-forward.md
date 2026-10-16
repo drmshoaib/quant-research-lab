@@ -172,7 +172,7 @@ Ridge asks whether a stable linear combination of features is enough.
 
 HistGradientBoosting can learn thresholds and interactions.
 
-EXP-001 found Ridge weak and statistically insignificant while the nonlinear model produced materially positive rank IC. This suggests the predictive relation is not well represented by a simple fixed linear map.
+EXP-001 found the weakly regularised Ridge/near-OLS baseline statistically insignificant while the nonlinear model produced materially positive rank IC. EXP-008 repeated the linear comparison with sample-size-scaled Ridge regularisation and again found no signal (mean IC about 0.00143, lag-10 p about 0.863). This strengthens the conclusion that the useful development relation is not well represented by a simple fixed linear map.
 
 ## 8. Why avoid a giant model search?
 
