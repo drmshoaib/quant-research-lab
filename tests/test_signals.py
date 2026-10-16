@@ -44,3 +44,20 @@ def test_causal_rank_ewma_preserves_rows():
     out = causal_rank_ewma(pred, span=3)
     assert out.index.equals(pred.index)
     assert list(out.columns) == list(pred.columns)
+
+
+def test_causal_rank_ewma_is_exactly_cross_sectionally_centred():
+    dates = pd.bdate_range("2024-02-01", periods=6)
+    symbols = ["A", "B", "C", "D"]
+    idx = pd.MultiIndex.from_product([dates, symbols], names=["date", "symbol"])
+    pred = pd.DataFrame(
+        {
+            "y_true": np.arange(len(idx), dtype=float),
+            "y_pred": np.tile([1.0, 2.0, 4.0, 8.0], len(dates)),
+            "fold": 1,
+        },
+        index=idx,
+    )
+    out = causal_rank_ewma(pred, span=3)
+    means = out["y_pred"].groupby(level="date").mean()
+    assert np.allclose(means.to_numpy(), 0.0, atol=1e-12)
