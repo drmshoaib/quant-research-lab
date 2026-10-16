@@ -119,11 +119,15 @@ def composite_ic_diagnostics(
     if group_ic.empty:
         raise ValueError("group_ic is empty")
 
-    full = group_ic.mean(axis=1, skipna=True).dropna().rename("equal_weight_group_ic")
+    full = (
+        group_ic.dropna(how="any")
+        .mean(axis=1)
+        .rename("equal_weight_group_ic")
+    )
     non_us = (
         group_ic[non_us_groups]
-        .mean(axis=1, skipna=True)
-        .dropna()
+        .dropna(how="any")
+        .mean(axis=1)
         .rename("equal_weight_non_us_ic")
     )
 
