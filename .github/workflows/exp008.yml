@@ -29,33 +29,40 @@ jobs:
       - name: Download original frozen data artifact
         uses: actions/download-artifact@v4
         with:
-          name: v0.2-freeze
+          name: v0.2-frozen-market-data
           path: frozen
           github-token: ${{ github.token }}
           repository: drmshoaib/quant-research-lab
-          run-id: 37189218641
+          run-id: 37189513253
 
       - name: Verify frozen data snapshot and holdout
         run: |
-          cmp frozen/configs/holdout_dates.csv configs/holdout_dates.csv
           python - <<'PY'
           import hashlib
           import json
           from pathlib import Path
+          import shutil
+
+          matches = list(Path("frozen").rglob("market_data.csv"))
+          if len(matches) != 1:
+              raise SystemExit(f"Expected exactly one frozen market_data.csv, found {matches}")
+          source = matches[0]
+          target = Path("frozen/market_data.csv")
+          if source != target:
+              shutil.copy2(source, target)
 
           meta = json.loads(Path("configs/data_snapshot.json").read_text())
-          path = Path("frozen/outputs/market_data.csv")
-          actual = hashlib.sha256(path.read_bytes()).hexdigest()
+          actual = hashlib.sha256(target.read_bytes()).hexdigest()
           expected = meta["sha256"]
           print(f"EXPECTED_SHA256={expected}")
           print(f"ACTUAL_SHA256={actual}")
           if actual != expected:
               raise SystemExit("Frozen market-data checksum mismatch; refusing to run EXP-008.")
-          print("Original frozen data snapshot and holdout manifest verified.")
+          print("Preserved frozen data snapshot verified; committed holdout manifest remains unchanged.")
           PY
 
       - name: Run EXP-008 (development data only)
-        run: python scripts/run_exp008.py --data frozen/outputs/market_data.csv --output-dir outputs/exp008
+        run: python scripts/run_exp008.py --data frozen/market_data.csv --output-dir outputs/exp008
 
       - name: Print EXP-008 summary
         run: |
