@@ -25,8 +25,8 @@ def causal_rank_ewma(predictions: pd.DataFrame, *, span: int) -> pd.DataFrame:
         out["y_pred"]
         .groupby(level="date", sort=True)
         .rank(method="average", pct=True)
-        .sub(0.5)
     )
+    ranked = ranked - ranked.groupby(level="date", sort=True).transform("mean")
     wide = ranked.unstack("symbol").sort_index()
     smooth = wide.ewm(span=span, adjust=False, min_periods=1, ignore_na=True).mean()
     smooth_long = smooth.stack().rename("y_pred")
