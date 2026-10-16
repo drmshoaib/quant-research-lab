@@ -83,7 +83,7 @@ Its SHA-256 checksum is
 ec782ac2cd812a6d81abcbf9cbcdecdd448ab8822b585fbd07c3a74968a3bbd3
 ~~~
 
-The large CSV was stored as a workflow artifact rather than committed as ordinary source.
+The large CSV was stored as a workflow artifact rather than committed as ordinary source. The original short-retention freeze artifact expired, but EXP-001 preserved a 90-day byte-identical copy named `v0.2-frozen-market-data` in workflow run `37189513253`. All later methods work verifies that file against the same SHA-256 before use.
 
 To reproduce the **official** results, use the byte-identical frozen snapshot. A new Yahoo download at a later date may contain provider revisions.
 
@@ -310,7 +310,26 @@ which is not less than the pre-registered 0.05 threshold.
 
 Again, faithful reproduction includes reproducing the failure.
 
-## 17. Portfolio-accounting correction
+## 17. EXP-008 — methods sensitivity
+
+Runner: [scripts/run_exp008.py](../../scripts/run_exp008.py).
+
+EXP-008 was registered after an independent review identified four methodological issues: automatic random-row early stopping, a short HAC lag, weak Ridge regularisation and a placebo that did not isolate timing skill.
+
+The pinned Python 3.11 environment is in [requirements-exp008.txt](../../requirements-exp008.txt). The successful run used Python 3.11.17, NumPy 2.4.6, pandas 3.0.5, scikit-learn 1.9.1 and statsmodels 0.15.0.
+
+Key results:
+
+| Variant | Mean IC | Lag-10 p | Timing-placebo p |
+|---|---:|---:|---:|
+| Frozen control | 0.02701 | 0.000254 | 0.034 |
+| No early stopping | 0.02322 | 0.000984 | 0.082 |
+| Time-ordered early stopping | 0.01830 | 0.0231 | 0.109 |
+
+Three of four pre-registered gates pass. The timing gate fails because the corrected no-early-stopping model does not reject the timing placebo at 5%. A faithful reproduction must reproduce that failure.
+
+Full results: [docs/exp008_results.md](../exp008_results.md).
+## 18. Portfolio-accounting correction
 
 Read [accounting_correction.md](../accounting_correction.md).
 
@@ -323,7 +342,7 @@ The predictive targets, model scores, rank IC, model selection and EXP-006/007 r
 
 The correction workflow is [.github/workflows/economic-correction.yml](../../.github/workflows/economic-correction.yml).
 
-## 18. GitHub Actions as experiment records
+## 19. GitHub Actions as experiment records
 
 Workflow YAML files specify:
 
@@ -338,7 +357,7 @@ This provides a cleaner audit trail than a notebook whose execution order may be
 
 Read each workflow beside its matching script.
 
-## 19. What should match?
+## 20. What should match?
 
 A faithful reproduction should match, apart from negligible floating-point differences:
 
@@ -352,7 +371,7 @@ A faithful reproduction should match, apart from negligible floating-point diffe
 - selected/rejected execution rules;
 - permutation seed and empirical p-value.
 
-## 20. Floating-point tolerance
+## 21. Floating-point tolerance
 
 Numbers such as
 
@@ -372,7 +391,7 @@ A difference that changes a registered gate is not.
 
 For example, moving a retention result from 79.96% to 80.10% would require investigation because the research decision could change.
 
-## 21. How to audit one prediction row
+## 22. How to audit one prediction row
 
 Choose one date and symbol from a predictions output.
 
@@ -389,7 +408,7 @@ Then:
 
 Doing this once turns the whole pipeline from a black box into a transparent sequence of calculations.
 
-## 22. Safe extension rules
+## 23. Safe extension rules
 
 Before a new research experiment, specify:
 
@@ -405,7 +424,7 @@ The format is illustrated in [research_log.md](../research_log.md).
 
 Do not search repeatedly until a pleasing result appears.
 
-## 23. Never use the final hold-out as a debugging set
+## 24. Never use the final hold-out as a debugging set
 
 If the hold-out is opened and then the model, features or thresholds are changed because the result is disappointing, the hold-out becomes development data.
 
