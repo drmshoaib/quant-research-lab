@@ -299,46 +299,133 @@ def optimise_weights(
     risk_aversion: float = 5.0,
     turnover_penalty: float = 0.002,
 ) -> pd.Series:
-    """Constrained alpha/risk/turnover optimisation using SLSQP.
+    """Constrained alpha/risk/turnover optimisation with exact L1 auxiliaries.
 
-    Objective: maximise alpha'w - lambda*w'Sigma*w - gamma*|w-w_prev|_1
-    subject to dollar neutrality, gross exposure, and per-name bounds.
+    Maximises alpha'w - lambda*w'Sigma*w - gamma*|w-w_prev|_1 subject to
+    dollar neutrality, exact gross exposure and per-name bounds. This helper
+    is not used by the frozen v0.2 experiments.
     """
     names = alpha.dropna().index.intersection(covariance.index).intersection(covariance.columns)
     if len(names) < 2:
         return pd.Series(0.0, index=alpha.index)
+
     a = alpha.loc[names].to_numpy(dtype=float)
     cov = covariance.loc[names, names].to_numpy(dtype=float)
     cov = 0.5 * (cov + cov.T) + np.eye(len(names)) * 1e-8
-    prev = np.zeros(len(names)) if previous is None else previous.reindex(names).fillna(0.0).to_numpy(dtype=float)
-    eps = 1e-8
+    prev = (
+        np.zeros(len(names), dtype=float)
+        if previous is None
+        else previous.reindex(names).fillna(0.0).to_numpy(dtype=float)
+    )
+    n = len(names)
 
-    def smooth_abs(x: np.ndarray) -> np.ndarray:
-        return np.sqrt(x * x + eps)
+    fallback = rank_weights(
+        pd.Series(a, index=names),
+        gross_limit=gross_limit,
+        max_abs_weight=max_abs_weight,
+    ).to_numpy(dtype=float)
+    prev_feasible = (
+        abs(float(prev.sum())) <= 1e-8
+        and float(np.abs(prev).sum()) <= gross_limit + 1e-8
+        and float(np.abs(prev).max()) <= max_abs_weight + 1e-8
+    )
+    w0 = prev.copy() if prev_feasible else fallback
 
-    def objective(w: np.ndarray) -> float:
-        utility = a @ w - risk_aversion * (w @ cov @ w) - turnover_penalty * smooth_abs(w - prev).sum()
-        return -float(utility)
+    # x = [w (n), turnover auxiliaries u (n), gross auxiliaries g (n)]
+    x0 = np.concatenate([w0, np.abs(w0 - prev), np.abs(w0)])
+    lower = np.concatenate([
+        np.full(n, -max_abs_weight),
+        np.zeros(n),
+        np.zeros(n),
+    ])
+    upper = np.concatenate([
+        np.full(n, max_abs_weight),
+        np.full(n, np.inf),
+        np.full(n, max_abs_weight),
+    ])
 
-    constraints = [
-        {"type": "eq", "fun": lambda w: float(w.sum())},
-        {"type": "ineq", "fun": lambda w: float(gross_limit - smooth_abs(w).sum())},
-    ]
-    x0 = rank_weights(pd.Series(a, index=names), gross_limit=min(gross_limit, 0.9 * gross_limit), max_abs_weight=max_abs_weight).to_numpy()
+    rows: list[np.ndarray] = []
+    lbs: list[float] = []
+    ubs: list[float] = []
+    for i in range(n):
+        # u_i >= |w_i - prev_i|
+        row = np.zeros(3 * n)
+        row[i] = -1.0
+        row[n + i] = 1.0
+        rows.append(row)
+        lbs.append(-prev[i])
+        ubs.append(np.inf)
+
+        row = np.zeros(3 * n)
+        row[i] = 1.0
+        row[n + i] = 1.0
+        rows.append(row)
+        lbs.append(prev[i])
+        ubs.append(np.inf)
+
+        # g_i >= |w_i|
+        row = np.zeros(3 * n)
+        row[i] = -1.0
+        row[2 * n + i] = 1.0
+        rows.append(row)
+        lbs.append(0.0)
+        ubs.append(np.inf)
+
+        row = np.zeros(3 * n)
+        row[i] = 1.0
+        row[2 * n + i] = 1.0
+        rows.append(row)
+        lbs.append(0.0)
+        ubs.append(np.inf)
+
+    row = np.zeros(3 * n)
+    row[2 * n:] = 1.0
+    rows.append(row)
+    lbs.append(-np.inf)
+    ubs.append(gross_limit)
+
+    inequalities = LinearConstraint(np.vstack(rows), np.asarray(lbs), np.asarray(ubs))
+    neutral_row = np.zeros((1, 3 * n))
+    neutral_row[0, :n] = 1.0
+    neutrality = LinearConstraint(neutral_row, np.array([0.0]), np.array([0.0]))
+
+    def objective(x: np.ndarray) -> float:
+        w = x[:n]
+        u = x[n : 2 * n]
+        return float(
+            -(a @ w)
+            + risk_aversion * (w @ cov @ w)
+            + turnover_penalty * u.sum()
+        )
+
+    def gradient(x: np.ndarray) -> np.ndarray:
+        grad = np.zeros(3 * n, dtype=float)
+        grad[:n] = -a + 2.0 * risk_aversion * (cov @ x[:n])
+        grad[n : 2 * n] = turnover_penalty
+        return grad
+
     result = minimize(
         objective,
         x0,
+        jac=gradient,
         method="SLSQP",
-        bounds=[(-max_abs_weight, max_abs_weight)] * len(names),
-        constraints=constraints,
-        options={"maxiter": 500, "ftol": 1e-10},
+        bounds=Bounds(lower, upper),
+        constraints=[inequalities, neutrality],
+        options={"maxiter": 500, "ftol": 1e-10, "disp": False},
     )
-    if not result.success:
-        w = rank_weights(pd.Series(a, index=names), gross_limit=gross_limit, max_abs_weight=max_abs_weight)
-    else:
-        w = pd.Series(result.x, index=names)
+
+    candidate = result.x[:n]
+    feasible = bool(
+        result.success
+        and abs(float(candidate.sum())) <= 1e-6
+        and float(np.abs(candidate).sum()) <= gross_limit + 1e-6
+        and float(np.abs(candidate).max()) <= max_abs_weight + 1e-6
+    )
+    if not feasible:
+        candidate = prev if prev_feasible else fallback
+
     out = pd.Series(0.0, index=alpha.index, dtype=float)
-    out.loc[names] = w
+    out.loc[names] = candidate
     return out
 
 
