@@ -111,53 +111,22 @@ def global_symbol_permutation_test(
     """Global symbol-identity permutation test for mean daily Spearman rank IC.
 
     A single symbol permutation is applied to every date in each replicate,
-    preserving complete prediction paths and serial dependence.
+    preserving complete prediction paths and serial dependence. Dates with a
+    degenerate truth or score rank vector (all ties) are excluded because
+    Spearman correlation is undefined there.
     """
     if n_permutations < 1:
         raise ValueError("n_permutations must be >= 1")
-    required = {"y_true", "y_pred"}
-    missing = required.difference(predictions.columns)
-    if missing:
-        raise ValueError(f"predictions missing columns: {sorted(missing)}")
-
-    truth = predictions["y_true"].unstack("symbol").sort_index()
-    score = predictions["y_pred"].unstack("symbol").reindex(
-        index=truth.index,
-        columns=truth.columns,
-    )
-    complete = truth.notna().all(axis=1) & score.notna().all(axis=1)
-    truth = truth.loc[complete]
-    score = score.loc[complete]
-    if truth.empty:
-        raise ValueError("no complete dates available for permutation test")
-    if truth.shape[1] < 4:
-        raise ValueError("permutation test requires at least four symbols")
-
-    truth_rank = truth.rank(axis=1, method="average").to_numpy(dtype=float)
-    score_rank = score.rank(axis=1, method="average").to_numpy(dtype=float)
-
-    truth_centered = truth_rank - truth_rank.mean(axis=1, keepdims=True)
-    score_centered = score_rank - score_rank.mean(axis=1, keepdims=True)
-
-    truth_norm = np.sqrt(np.square(truth_centered).sum(axis=1))
-    score_norm = np.sqrt(np.square(score_centered).sum(axis=1))
-    denominator = truth_norm * score_norm
-    if np.any(denominator <= 0):
-        raise ValueError("degenerate rank vectors in permutation test")
-
-    observed_daily = (
-        truth_centered * score_centered
-    ).sum(axis=1) / denominator
+    truth_centered, score_centered, denominator, shape = _centred_rank_matrices(predictions)
+    observed_daily = (truth_centered * score_centered).sum(axis=1) / denominator
     observed_mean = float(observed_daily.mean())
 
     rng = np.random.default_rng(seed)
-    n_symbols = truth.shape[1]
+    n_symbols = shape[1]
     null = np.empty(n_permutations, dtype=float)
     for i in range(n_permutations):
         perm = rng.permutation(n_symbols)
-        daily = (
-            truth_centered * score_centered[:, perm]
-        ).sum(axis=1) / denominator
+        daily = (truth_centered * score_centered[:, perm]).sum(axis=1) / denominator
         null[i] = float(daily.mean())
 
     p = float((1 + np.sum(null >= observed_mean)) / (n_permutations + 1))
@@ -165,8 +134,8 @@ def global_symbol_permutation_test(
         observed_mean_ic=observed_mean,
         null_mean_ics=null,
         empirical_p_value=p,
-        dates_used=int(truth.shape[0]),
-        symbols_used=int(truth.shape[1]),
+        dates_used=int(shape[0]),
+        symbols_used=int(shape[1]),
     )
 
 
@@ -190,9 +159,10 @@ def _centred_rank_matrices(predictions: pd.DataFrame):
     tc = tr - tr.mean(axis=1, keepdims=True)
     sc = sr - sr.mean(axis=1, keepdims=True)
     denominator = np.sqrt(np.square(tc).sum(axis=1)) * np.sqrt(np.square(sc).sum(axis=1))
-    if np.any(denominator <= 0):
-        raise ValueError("degenerate rank vectors in permutation test")
-    return tc, sc, denominator, truth.shape
+    valid = denominator > 0
+    if not np.any(valid):
+        raise ValueError("all complete dates have degenerate rank vectors")
+    return tc[valid], sc[valid], denominator[valid], (int(valid.sum()), int(truth.shape[1]))
 
 
 def global_date_permutation_test(
