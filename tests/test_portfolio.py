@@ -182,3 +182,20 @@ def test_no_trade_band_path_is_causal_and_terminal_liquidation_is_exact():
         changed_actual.loc[past].to_numpy(),
     )
 
+
+
+def test_optimizer_exact_l1_turnover_penalty_respects_feasible_previous():
+    names = [f"A{i}" for i in range(6)]
+    alpha = pd.Series(0.0, index=names)
+    cov = pd.DataFrame(np.eye(len(names)) * 0.01, index=names, columns=names)
+    previous = pd.Series([0.08, 0.04, 0.0, 0.0, -0.04, -0.08], index=names)
+    w = optimise_weights(
+        alpha,
+        cov,
+        previous=previous,
+        gross_limit=1.0,
+        max_abs_weight=0.08,
+        risk_aversion=0.0,
+        turnover_penalty=1.0,
+    )
+    assert np.allclose(w.to_numpy(), previous.to_numpy(), atol=1e-6)
