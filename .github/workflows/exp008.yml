@@ -21,7 +21,7 @@ jobs:
           python-version: "3.11"
 
       - run: python -m pip install --upgrade pip
-      # Pinned scientific stack: EXP-008 records the exact library versions in its summary,
+      # Pinned scientific stack (Python 3.11-compatible): EXP-008 records the exact library versions in its summary,
       # and the frozen v0.2 control row is only expected to reproduce under these pins.
       - run: pip install -r requirements-exp008.txt
       - run: pip install -e . --no-deps
