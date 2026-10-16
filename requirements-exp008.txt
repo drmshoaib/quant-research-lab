@@ -4,8 +4,9 @@
 # records the versions in outputs/exp008/summary.json.
 # NumPy 2.5.x requires Python >=3.12; the registered workflow is Python 3.11,
 # so 2.4.6 is the latest compatible NumPy pin for this registered environment.
+# SciPy 1.18.x likewise requires Python >=3.12; 1.17.1 is the latest compatible pin.
 numpy==2.4.6
 pandas==3.0.5
-scipy==1.18.1
+scipy==1.17.1
 scikit-learn==1.9.1
 statsmodels==0.15.0
