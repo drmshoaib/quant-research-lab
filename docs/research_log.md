@@ -672,7 +672,7 @@ The final 252-date hold-out was not accessed.
 ## EXP-008 — Methods re-run: early stopping, inference lag, Ridge scaling, timing placebo
 
 **Date registered:** 5 October 2026  
-**Status:** registered — awaiting execution on the frozen data artefact (`.github/workflows/exp008.yml`)
+**Status:** complete — G1/G2/G3 passed; G4 timing placebo failed
 
 **Question**  
 Do the frozen v0.2 development conclusions for `pruned8` survive when four methodological
@@ -736,12 +736,33 @@ them. **The hold-out is not touched.**
 runs plus two 999-replicate placebos per boosting variant.
 
 **Result**  
-Pending execution of `.github/workflows/exp008.yml` on the frozen artefact
-(workflow run 37189218641, SHA-256 verified before the run).
+The frozen control reproduced exactly: mean rank IC 0.0270088. At lag 10 its HAC
+p-value is 0.000254. The no-early-stopping variant has mean IC 0.0232187 and lag-10
+p = 0.000984; the time-ordered early-stopping variant has mean IC 0.0183009 and
+lag-10 p = 0.0231. Thus the five-session development signal survives the safer HAC
+lag and explicit early-stopping choices.
+
+The frozen random-row early stopping used a median 110 trees per fold (range 12–245).
+Turning early stopping off fits 250 trees in every fold. The time-ordered validation
+rule selected a median 12 trees (range 10–86), showing that early-stopping design
+materially affects model complexity and signal magnitude, although not the sign of the
+development IC.
+
+The stronger Ridge penalty remains null: mean IC 0.001434, lag-10 p = 0.863.
+
+Symbol-identity placebos remain significant for all boosting variants (p = 0.001,
+0.001 and 0.003). The new timing placebo is mixed: control p = 0.034, no-early-stopping
+p = 0.082 and time-ordered p = 0.109. Therefore **G4 fails**. The evidence supports
+nonlinear cross-sectional structure but robust date-specific timing skill is not
+established across corrected variants.
+
+Gate results: **G1 PASS, G2 PASS, G3 PASS, G4 FAIL**.
 
 **Decision**  
-Not applicable (methods experiment). The research note gains a "Methods sensitivity"
-section quoting the EXP-008 table once the run has completed.
+No frozen v0.2 number or model choice is changed. The research note is downgraded on
+the timing interpretation: it may describe statistically supported cross-sectional
+predictive structure, but must state that the corrected variants do not reject a
+static/slow cross-sectional-tilt explanation under the timing placebo.
 
 **Commit / output references**  
 Code: `src/quantlab/models.py` (`hist_gb_v03`, `hist_gb_v03_time`, `ridge_v03`),
@@ -749,4 +770,7 @@ Code: `src/quantlab/models.py` (`hist_gb_v03`, `hist_gb_v03_time`, `ridge_v03`),
 `src/quantlab/pipeline.py` (`walk_forward_predictions_with_diagnostics`),
 `src/quantlab/robustness.py` (`global_date_permutation_test`), `scripts/run_exp008.py`,
 `requirements-exp008.txt`, `tests/test_models_v03.py`, `tests/test_robustness.py`.
-Outputs will be attached as the `exp008-methods-results` artefact.
+Successful workflow run: `38923117741`.  
+Results: `docs/exp008_results.md`.  
+Artifact: `12055513405`, digest
+`sha256:9a57d77dd6313cf713a738dba8135af879d15d3a284c569600629d71f7c05452`.
