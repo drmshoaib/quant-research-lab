@@ -135,6 +135,7 @@ def backtest_summary(daily: pd.DataFrame) -> dict[str, float]:
     if daily.empty:
         return {
             "ann_return": math.nan,
+            "ann_arithmetic_return": math.nan,
             "ann_vol": math.nan,
             "sharpe": math.nan,
             "max_drawdown": math.nan,
@@ -150,6 +151,7 @@ def backtest_summary(daily: pd.DataFrame) -> dict[str, float]:
     avg_turnover = float(daily["turnover"].mean())
     return {
         "ann_return": ann_return,
+        "ann_arithmetic_return": ann_return,
         "ann_vol": ann_vol,
         "sharpe": float(sharpe),
         "max_drawdown": float(drawdown.min()),
